@@ -298,6 +298,17 @@ function analyzeCommandSemantics(command: string, evidence: SecurityEvidence[]):
     });
   }
 
+  const criticalRedirects =
+    cmd.match(/(?:>|>>)\s*(\/(?:etc|root|proc|dev|sys)\/[^\s;|&]*)/gi) ?? [];
+  if (criticalRedirects.length > 0) {
+    level = higherRisk(level, "critical");
+    evidence.push({
+      code: "command_sensitive_redirection",
+      message: "Command redirects output into sensitive system paths",
+      metadata: { targets: criticalRedirects.slice(0, 5) },
+    });
+  }
+
   return level;
 }
 

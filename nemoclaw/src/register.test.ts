@@ -116,6 +116,17 @@ describe("getPluginConfig", () => {
     expect(config.security.mode).toBe("enforce");
   });
 
+  it("accepts warn security mode from pluginConfig", () => {
+    const api = createMockApi();
+    api.pluginConfig = {
+      security: {
+        mode: "warn",
+      },
+    };
+    const config = getPluginConfig(api);
+    expect(config.security.mode).toBe("warn");
+  });
+
   it("uses string values from pluginConfig", () => {
     const api = createMockApi();
     api.pluginConfig = {

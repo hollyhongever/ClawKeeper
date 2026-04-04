@@ -89,10 +89,12 @@ function postJson(urlValue: string, payload: unknown, timeoutMs: number): Promis
 
 function normalizeDecisionByMode(decision: SecurityDecision, mode: SecurityMode): SecurityDecision {
   if (mode === "off") {
+    const recommendedAction = decision.action === "allow" ? undefined : decision.action;
     return {
       ...decision,
       action: "allow",
-      recommendedAction: decision.action,
+      recommendedAction,
+      rolloutStage: "off",
       riskLevel: "low",
       riskScore: 0,
       reason: "Security mode is off",
@@ -104,33 +106,55 @@ function normalizeDecisionByMode(decision: SecurityDecision, mode: SecurityMode)
       ...decision,
       action: "allow",
       recommendedAction: decision.action,
+      rolloutStage: "audit",
     };
   }
 
-  return decision;
+  if (mode === "warn" && decision.action !== "allow") {
+    return {
+      ...decision,
+      action: "allow",
+      recommendedAction: decision.action,
+      rolloutStage: "warn",
+    };
+  }
+
+  return {
+    ...decision,
+    rolloutStage: mode,
+  };
 }
 
 function ensureEventPath(pathValue: string): void {
   mkdirSync(dirname(pathValue), { recursive: true });
 }
 
-function shouldWriteEvent(action: SecurityAction, includeAllowEvents: boolean): boolean {
-  return includeAllowEvents || action !== "allow";
+function shouldWriteEvent(
+  decision: SecurityDecision,
+  mode: SecurityMode,
+  includeAllowEvents: boolean,
+): boolean {
+  if (includeAllowEvents) return true;
+  if (decision.action !== "allow") return true;
+  return mode === "warn" && decision.recommendedAction !== undefined;
 }
 
 function toHookResponse(
   decision: SecurityDecision,
+  mode: SecurityMode,
   approvalTimeoutMs: number,
 ): Record<string, unknown> {
+  const security = {
+    riskLevel: decision.riskLevel,
+    riskScore: decision.riskScore,
+    evidence: decision.evidence,
+  };
+
   if (decision.action === "block") {
     return {
       block: true,
       reason: decision.reason,
-      security: {
-        riskLevel: decision.riskLevel,
-        riskScore: decision.riskScore,
-        evidence: decision.evidence,
-      },
+      security,
     };
   }
 
@@ -139,22 +163,37 @@ function toHookResponse(
       requireApproval: true,
       timeoutMs: approvalTimeoutMs,
       reason: decision.reason,
-      security: {
-        riskLevel: decision.riskLevel,
-        riskScore: decision.riskScore,
-        evidence: decision.evidence,
-      },
+      security,
     };
   }
 
-  return {
+  const response: Record<string, unknown> = {
     allow: true,
-    security: {
-      riskLevel: decision.riskLevel,
-      riskScore: decision.riskScore,
-      evidence: decision.evidence,
-    },
+    security,
   };
+
+  if (
+    mode === "warn" &&
+    decision.recommendedAction !== undefined &&
+    decision.recommendedAction !== "allow"
+  ) {
+    response["warning"] = {
+      message: `Allowed by warn mode; recommended action is ${decision.recommendedAction}`,
+      recommendedAction: decision.recommendedAction,
+      rolloutStage: "warn",
+      reason: decision.reason,
+      security,
+    };
+  }
+
+  return response;
+}
+
+function deriveEventRolloutStage(decision: SecurityDecision, mode: SecurityMode): SecurityMode {
+  if (decision.rolloutStage !== undefined) {
+    return decision.rolloutStage;
+  }
+  return mode;
 }
 
 function createEvent(
@@ -165,6 +204,10 @@ function createEvent(
   target: string,
   details: Record<string, unknown>,
 ): SecurityEventV1 {
+  const recommendedAction = decision.recommendedAction;
+  const action = recommendedAction ?? decision.action;
+  const rolloutStage = deriveEventRolloutStage(decision, mode);
+
   return {
     eventVersion: "security-event.v1",
     id: randomUUID(),
@@ -172,14 +215,23 @@ function createEvent(
     hook,
     mode,
     sandboxName,
-    action: decision.recommendedAction ?? decision.action,
+    action,
     effectiveAction: decision.action,
+    recommendedAction,
+    rolloutStage,
     riskLevel: decision.riskLevel,
     riskScore: decision.riskScore,
     reason: decision.reason,
     evidence: decision.evidence,
     target,
-    details,
+    details: {
+      ...details,
+      stagedDecision: {
+        recommendedAction: action,
+        effectiveAction: decision.action,
+        rolloutStage,
+      },
+    },
   };
 }
 
@@ -230,13 +282,13 @@ export function registerSecurityHooks(api: OpenClawPluginApi, config: NemoClawCo
       },
     );
 
-    if (shouldWriteEvent(effectiveDecision.action, policy.audit.includeAllowEvents)) {
+    if (shouldWriteEvent(effectiveDecision, mode, policy.audit.includeAllowEvents)) {
       appendFileSync(eventsPath, `${JSON.stringify(event)}\n`, { encoding: "utf-8" });
     }
 
     await maybeSendAlert(api, config.security.alertWebhook, policy.audit.webhookOn, event);
 
-    return toHookResponse(effectiveDecision, config.security.approvalTimeoutMs);
+    return toHookResponse(effectiveDecision, mode, config.security.approvalTimeoutMs);
   };
 
   api.on("before_tool_call", async (...args: unknown[]) =>

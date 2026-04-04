@@ -252,6 +252,55 @@ function scanPatterns(
   return level;
 }
 
+function countCommandVerbs(command: string): number {
+  const matches =
+    command.match(
+      /\b(rm|mv|cp|cat|echo|curl|wget|bash|sh|python|node|npm|git|docker|kubectl|chmod|chown|tar|zip|unzip)\b/gi,
+    ) ?? [];
+  return new Set(matches.map((entry) => entry.toLowerCase())).size;
+}
+
+function analyzeCommandSemantics(command: string, evidence: SecurityEvidence[]): SecurityRiskLevel {
+  const cmd = command.trim();
+  if (!cmd) return "low";
+
+  let level: SecurityRiskLevel = "low";
+
+  if (/(^|\s)(sudo|su)\s+/i.test(cmd)) {
+    level = higherRisk(level, "high");
+    evidence.push({
+      code: "command_privilege_escalation",
+      message: "Command requests privilege escalation",
+    });
+  }
+
+  if (/`[^`]+`|\$\([^)]*\)/.test(cmd)) {
+    level = higherRisk(level, "high");
+    evidence.push({
+      code: "command_dynamic_substitution",
+      message: "Command uses dynamic shell substitution",
+    });
+  }
+
+  if (/(;|&&|\|\|)/.test(cmd) && countCommandVerbs(cmd) >= 2) {
+    level = higherRisk(level, "medium");
+    evidence.push({
+      code: "command_chaining",
+      message: "Command contains chained operations",
+    });
+  }
+
+  if (/\b(base64|openssl)\b[\s\S]{0,80}\b(-d|decode)\b[\s\S]{0,80}\|\s*(bash|sh)\b/i.test(cmd)) {
+    level = higherRisk(level, "high");
+    evidence.push({
+      code: "command_decoded_payload_execution",
+      message: "Command decodes and executes payload in shell",
+    });
+  }
+
+  return level;
+}
+
 function walkFiles(basePath: string, maxFiles: number): string[] {
   const queue: string[] = [basePath];
   const files: string[] = [];
@@ -348,6 +397,7 @@ export class SecurityEngine {
       ),
     );
 
+    risk = higherRisk(risk, analyzeCommandSemantics(context.command || context.text, evidence));
     risk = higherRisk(risk, findRiskByPath(context.paths, this.policy, evidence));
     risk = higherRisk(risk, findRiskByHosts(context.hosts, this.policy, evidence));
 

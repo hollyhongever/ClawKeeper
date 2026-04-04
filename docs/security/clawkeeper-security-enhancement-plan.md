@@ -135,10 +135,10 @@ This section tracks implementation status for milestone execution and parallel c
 | Milestone | Status | Notes |
 |---|---|---|
 | M1 Security Core Skeleton | Completed | `security` config namespace, policy loader, shared decision types are implemented. |
-| M2 High-Risk Operation Interception | Completed (v1) | `before_tool_call` and `after_tool_call` hooks with command, path, network, prompt, and quota signals are active. |
-| M3 Malicious Skill Admission Control | Completed (v1) | `before_install` admission path with offline-first pattern scanning and optional external scanner command is active. |
-| M4 Audit and Alert Closure | Completed (v1) | `security-event.v1` JSONL logging, webhook alert path, and security CLI commands are implemented. |
-| M5 Sandbox Policy Complements | Completed (v1) | strict egress and sensitive read-only policy templates are present under blueprint templates. |
+| M2 High-Risk Operation Interception | Completed (v2 hardening) | Adds semantic command signals for privilege escalation, dynamic substitution, decoded payload execution, command chaining, and sensitive-path redirection detection. |
+| M3 Malicious Skill Admission Control | Completed (v2 hardening) | Adds install target hardening for symlink escape detection, lifecycle-script detection, remote/insecure source handling, and structured scanner severity parsing with explicit fallback evidence. |
+| M4 Audit and Alert Closure | Completed (v2 hardening) | Adds filtered event browsing (`--action`, `--hook`, `--risk`, `--id`), malformed-line accounting, replay JSON mode, and prefix disambiguation with non-zero exit on ambiguity. |
+| M5 Sandbox Policy Complements | Completed (v2 hardening) | Adds `security-dev-balanced.yaml` and `security-ci-minimal.yaml` templates with docs and validation coverage for template parse/shape checks. |
 | M6-M10 Public Exposure Addendum | Planned | Password-first, encrypted credential store, unified redaction, staged dangerous-command policy, and rollout playbooks remain queued. |
 
 Current implementation branch baseline for parallel streams:
@@ -146,6 +146,7 @@ Current implementation branch baseline for parallel streams:
 - Base branch: `feature/security`
 - Parallel branches: `feature/security-main`, `feature/security-m2-hooks`, `feature/security-m3-install-gate`, `feature/security-m4-audit-cli`, `feature/security-m5-policy`, `feature/security-m6m8-exposure`, `feature/security-m9m10-rollout`
 - Worktrees are provisioned for each branch to avoid cross-stream file contention.
+- Integration status (2026-04-04): `feature/security-main` has integrated M2-M5 stream outputs and is the current baseline for M6-M10 development.
 
 ## Parallel Workstream Strategy
 
@@ -234,18 +235,18 @@ Expected outcome: validation succeeds and reports the resolved policy path.
 2. Show latest security events.
 
 ```console
-$ clawkeeper security events --limit 5
+$ clawkeeper security events --limit 5 --hook before_tool_call --risk high
 ```
 
-Expected outcome: event summary list appears, or an explicit "No events recorded yet" message.
+Expected outcome: filtered event summary appears, including malformed-line notice when present.
 
 3. Replay one event by ID.
 
 ```console
-$ clawkeeper security replay <event-id>
+$ clawkeeper security replay <event-id> --json
 ```
 
-Expected outcome: event detail includes hook, action, risk, reason, and evidence.
+Expected outcome: replay JSON includes event details plus dataset metadata (`matches`, `totalEvents`, `malformedLines`).
 
 ### Demo Notes
 

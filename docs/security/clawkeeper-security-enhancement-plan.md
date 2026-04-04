@@ -128,6 +128,25 @@ If a release introduces unacceptable regressions, use phased rollback.
 Use this plan as the source of truth for implementation order.
 Each milestone should land in an independent PR to keep review scope and rollback boundaries clear.
 
+## Execution Status Snapshot
+
+This section tracks implementation status for milestone execution and parallel coordination.
+
+| Milestone | Status | Notes |
+|---|---|---|
+| M1 Security Core Skeleton | Completed | `security` config namespace, policy loader, shared decision types are implemented. |
+| M2 High-Risk Operation Interception | Completed (v1) | `before_tool_call` and `after_tool_call` hooks with command, path, network, prompt, and quota signals are active. |
+| M3 Malicious Skill Admission Control | Completed (v1) | `before_install` admission path with offline-first pattern scanning and optional external scanner command is active. |
+| M4 Audit and Alert Closure | Completed (v1) | `security-event.v1` JSONL logging, webhook alert path, and security CLI commands are implemented. |
+| M5 Sandbox Policy Complements | Completed (v1) | strict egress and sensitive read-only policy templates are present under blueprint templates. |
+| M6-M10 Public Exposure Addendum | Planned | Password-first, encrypted credential store, unified redaction, staged dangerous-command policy, and rollout playbooks remain queued. |
+
+Current implementation branch baseline for parallel streams:
+
+- Base branch: `feature/security`
+- Parallel branches: `feature/security-main`, `feature/security-m2-hooks`, `feature/security-m3-install-gate`, `feature/security-m4-audit-cli`, `feature/security-m5-policy`, `feature/security-m6m8-exposure`, `feature/security-m9m10-rollout`
+- Worktrees are provisioned for each branch to avoid cross-stream file contention.
+
 ## Parallel Workstream Strategy
 
 This section defines how to execute milestone work in parallel without creating merge instability.
@@ -192,6 +211,46 @@ Recommended model:
    Merge contract baseline first, then M2-M5 branches, then M6-M10 branches.
 5. Final integration pass.
    Run full regression after all branches are rebased onto the latest integration branch.
+
+## Demo Runbook
+
+Use this runbook for a concise technical demo of the current security module baseline.
+
+### Demo Goals
+
+Show that policy validation, event browsing, and event replay are operational.
+Show that semantic security hooks and policy contracts are wired without breaking existing CLI flows.
+
+### Demo Script
+
+1. Validate security policy.
+
+```console
+$ clawkeeper security policy validate --file nemoclaw/security-policy.yaml
+```
+
+Expected outcome: validation succeeds and reports the resolved policy path.
+
+2. Show latest security events.
+
+```console
+$ clawkeeper security events --limit 5
+```
+
+Expected outcome: event summary list appears, or an explicit "No events recorded yet" message.
+
+3. Replay one event by ID.
+
+```console
+$ clawkeeper security replay <event-id>
+```
+
+Expected outcome: event detail includes hook, action, risk, reason, and evidence.
+
+### Demo Notes
+
+- If no events exist yet, generate one in a test environment before live demo.
+- Keep demo runs in `audit` mode when demonstrating behavior to stakeholders without operational interruption.
 
 ## Safe-OpenClaw Integration Addendum (Public Exposure)
 

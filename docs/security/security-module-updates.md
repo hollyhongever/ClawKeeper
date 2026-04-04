@@ -56,6 +56,34 @@ Use it as the release log for security milestones after the baseline plan is app
 - Security-focused CLI and engine tests pass.
 - Core CLI regression tests still pass for existing flows.
 
+## 2026-04-04 (Parallel Execution and Demo Readiness)
+
+### Added
+
+- Added parallel execution strategy to the security enhancement plan, including interface-freeze scope and branch ownership model.
+- Added explicit Codex coordination guidance for main-agent ownership and non-overlapping write scopes.
+- Added execution status snapshot to the plan, including milestone completion state and active parallel branch baseline.
+- Added demo runbook to the plan for policy validation, event listing, and event replay walkthroughs.
+- Provisioned dedicated parallel branches and worktrees for M2-M10 streams:
+  - `feature/security-main`
+  - `feature/security-m2-hooks`
+  - `feature/security-m3-install-gate`
+  - `feature/security-m4-audit-cli`
+  - `feature/security-m5-policy`
+  - `feature/security-m6m8-exposure`
+  - `feature/security-m9m10-rollout`
+
+### Changed
+
+- Updated planning docs to support technical write-up and stakeholder demo preparation.
+- Clarified that contract changes must land as isolated interface PRs before stream-level implementation rebases.
+
+### Validation Snapshot
+
+- Security policy validation command remains operational against `nemoclaw/security-policy.yaml`.
+- Security events command handles empty event logs with explicit user-facing output.
+- Branch and worktree topology for parallel execution has been created and verified.
+
 ## Next Steps
 
 - Continue appending future security changes here with exact dates and concise impact notes.

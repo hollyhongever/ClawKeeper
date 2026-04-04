@@ -84,6 +84,44 @@ Use it as the release log for security milestones after the baseline plan is app
 - Security events command handles empty event logs with explicit user-facing output.
 - Branch and worktree topology for parallel execution has been created and verified.
 
+## 2026-04-04 (M2-M5 Parallel Hardening Pass)
+
+### Added
+
+- Added semantic high-risk command signals in tool-call interception:
+  - privilege escalation (`sudo`, `su`)
+  - dynamic shell substitution (backticks, `$()`)
+  - decoded payload execution pipelines
+  - sensitive system-path redirection detection
+- Added install-admission hardening for local and remote targets:
+  - symlink escape detection
+  - install lifecycle-script detection (`preinstall`, `install`, `postinstall`)
+  - insecure `http://` source escalation
+  - structured scanner severity parsing and explicit scanner fallback evidence
+- Added event browsing filters to `clawkeeper security events`:
+  - `--action`
+  - `--hook`
+  - `--risk`
+  - `--id`
+- Added replay JSON mode and ambiguity handling to `clawkeeper security replay`, including non-zero exit on ambiguous ID prefixes.
+- Added new M5 policy templates:
+  - `nemoclaw-blueprint/policies/templates/security-dev-balanced.yaml`
+  - `nemoclaw-blueprint/policies/templates/security-ci-minimal.yaml`
+- Added new docs page for template operations: `docs/network-policy/security-policy-templates.md`.
+- Added template-shape validation coverage in `test/validate-blueprint.test.ts` for security template files.
+
+### Changed
+
+- Updated `docs/reference/commands.md` with new `security events` filter flags and `security replay --json` behavior.
+- Updated `docs/index.md` Network Policy toctree to include the security policy templates guide.
+- Updated `docs/security/clawkeeper-security-enhancement-plan.md` execution snapshot to reflect M2-M5 v2 hardening and demo command updates.
+
+### Validation Snapshot
+
+- `npm test -- test/security-engine.test.js` passes on the integration baseline.
+- `npm test -- test/security-cli.test.js` passes with new filter/replay behaviors.
+- `npm test -- test/validate-blueprint.test.ts` passes with template parse/shape assertions.
+
 ## Next Steps
 
 - Continue appending future security changes here with exact dates and concise impact notes.

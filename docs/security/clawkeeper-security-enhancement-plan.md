@@ -127,3 +127,154 @@ If a release introduces unacceptable regressions, use phased rollback.
 
 Use this plan as the source of truth for implementation order.
 Each milestone should land in an independent PR to keep review scope and rollback boundaries clear.
+
+## Parallel Workstream Strategy
+
+This section defines how to execute milestone work in parallel without creating merge instability.
+
+### Interface Freeze Before Parallel Build
+
+`Interface freeze` means locking shared contracts before parallel coding starts.
+Do not start concurrent implementation until all teams agree on these contracts.
+
+Freeze scope for this plan:
+
+1. Plugin config contract.
+   The `security` schema keys and default semantics in `openclaw.plugin.json` and parser logic.
+2. Decision contract.
+   `SecurityDecision` fields, allowed action values, and risk-level definitions.
+3. Event contract.
+   `security-event.v1` required fields and field meanings.
+4. Policy contract.
+   `security-policy.yaml` top-level sections and core key names.
+5. CLI contract.
+   Command names and required argument shapes for `security policy validate`, `security events`, and `security replay`.
+
+If any frozen contract must change, open one small contract PR first, merge it, and then rebase all active parallel branches.
+
+### Recommended Parallel Branch Mapping
+
+Use one branch per workstream with explicit ownership.
+
+| Workstream | Recommended branch | Primary owner |
+|---|---|---|
+| M2 hook interception | `feature/security-m2-hooks` | Runtime and plugin owner |
+| M3 install admission | `feature/security-m3-install-gate` | Supply-chain controls owner |
+| M4 audit and CLI | `feature/security-m4-audit-cli` | Platform tooling owner |
+| M5 policy templates | `feature/security-m5-policy` | Policy and docs owner |
+| M6-M8 public-exposure hardening | `feature/security-m6m8-exposure` | Gateway and credentials owner |
+| M9-M10 rollout and playbooks | `feature/security-m9m10-rollout` | Ops and release owner |
+
+### Synchronization Cadence
+
+Use fixed sync points to prevent drift.
+
+1. Contract sync.
+   Confirm no contract deltas before opening new parallel branches.
+2. Midpoint integration sync.
+   Merge test fixtures, shared helpers, and schema updates.
+3. Pre-merge gate sync.
+   Require green checks for `nemoclaw/npm run check`, targeted `vitest`, and doc references.
+
+### Codex Threading Guidance
+
+You can run parallel execution in Codex with either multiple chats or delegated sub-agents.
+
+Recommended model:
+
+1. Main agent.
+   Keep one main agent as coordinator for contract ownership, review, and merge order.
+2. Sub-agents or separate threads.
+   Assign each workstream to one sub-agent or one dedicated chat thread with a single branch owner.
+3. Non-overlapping write scope.
+   Avoid assigning the same file to multiple workers in the same phase unless explicitly planned.
+4. Merge sequence.
+   Merge contract baseline first, then M2-M5 branches, then M6-M10 branches.
+5. Final integration pass.
+   Run full regression after all branches are rebased onto the latest integration branch.
+
+## Safe-OpenClaw Integration Addendum (Public Exposure)
+
+This addendum extends the core ClawKeeper security blueprint for public gateway exposure scenarios.
+It defines how to selectively integrate safe-openclaw concepts without replacing the existing NemoClaw and OpenShell security foundation.
+
+### Decision Summary
+
+- Integration strategy is selective module adoption, not full fork replacement.
+- The deployment context is public gateway exposure, where authentication and operator-safe defaults are mandatory.
+- OpenShell sandbox and policy enforcement remain the primary boundary, while this addendum introduces semantic and credential-focused defense-in-depth controls.
+
+### Adopt / Adapt / Reject Matrix
+
+| Category | Decision | Scope |
+|---|---|---|
+| Adopt | Password-first gateway onboarding | Require password bootstrap flow for exposed gateways and avoid token-first onboarding guidance. |
+| Adopt | Localhost-only sensitive setup and reset endpoints | Restrict password setup and reset interfaces to local direct access. |
+| Adopt | Outbound secret redaction pipeline | Redact API key and token patterns in outbound, diagnostic, and operator-facing outputs. |
+| Adapt | Credential-at-rest encryption for `~/.nemoclaw/credentials.json` | Use modern KDF plus AES-256-GCM envelope encryption with migration support from plaintext entries. |
+| Reject | Unsalted SHA-256 password storage | Do not use unsalted password hashes as a durable credential primitive. |
+| Reject | Linux `unshare` and `mount` command wrapping as primary isolation | Keep OpenShell policy and sandbox boundary as primary isolation controls. |
+
+### Delivery Milestones (M6-M10)
+
+#### M6 Password-First Gateway Bootstrap
+
+- Introduce password-first bootstrap for publicly exposed gateway workflows.
+- Remove onboarding guidance that promotes `#token` control UI URLs.
+- Ensure pre-setup remote access is denied while local setup path remains available.
+
+#### M7 Encrypted Credential Store Migration
+
+- Add encrypted storage format for `~/.nemoclaw/credentials.json`.
+- Use modern KDF-derived keys and AES-256-GCM for value encryption.
+- Support automatic migration from existing plaintext credential records.
+
+#### M8 Unified Redaction Across Runtime Surfaces
+
+- Apply a shared redaction policy to CLI output, onboarding session records, and debug reports.
+- Cover high-confidence API key, bearer token, and credential assignment patterns.
+- Keep redaction behavior deterministic for incident review and reproducibility.
+
+#### M9 Semantic Dangerous-Command Policy
+
+- Introduce semantic dangerous-command policy with staged behavior: `warn` first, then `block`.
+- Align policy outcomes with OpenShell network and filesystem policy posture.
+- Emit auditable decision metadata for allow, warn, and block outcomes.
+
+#### M10 Rollout Controls and Operator Playbooks
+
+- Define staged rollout toggles for `audit`, `warn`, and `enforce` modes.
+- Update operator docs and troubleshooting playbooks for public exposure scenarios.
+- Add release gating checkpoints for docs parity and backward compatibility.
+
+### Public Interfaces and Contracts
+
+- Planned CLI contracts:
+  - `nemoclaw security set-password`
+  - `nemoclaw security status`
+- Planned environment contract:
+  - `NEMOCLAW_CRED_STORE_KEY`
+- Updated behavior contract:
+  - Onboarding output no longer promotes tokenized control UI URL guidance.
+
+### Acceptance Criteria for Addendum
+
+- Remote pre-setup access is blocked and localhost setup remains available.
+- Credential store migration leaves no plaintext provider keys in `~/.nemoclaw/credentials.json`.
+- Redaction consistently covers API key and token patterns across diagnostic and operator-visible outputs.
+- Existing `onboard`, `connect`, `status`, and `logs` flows remain backward compatible.
+
+### Test Plan
+
+1. Run markdown quality checks for this document and ensure no structural issues are introduced.
+2. Validate section discoverability and heading hierarchy for the appended addendum.
+3. Verify cross-document consistency against:
+   - `docs/security/best-practices.md`
+   - `docs/reference/commands.md`
+4. Confirm no conflicting security guidance remains for tokenized dashboard URL promotion in security-facing docs.
+
+### Assumptions
+
+- The existing security blueprint remains authoritative; this addendum is implementation-focused.
+- OpenShell policy and sandbox isolation remain the primary boundary; all additions are defense-in-depth.
+- Planned interface names are accepted as v1 contracts and may be refined in implementation PRs.

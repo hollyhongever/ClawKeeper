@@ -41,6 +41,7 @@ const {
 const registry = require("./lib/registry");
 const nim = require("./lib/nim");
 const policies = require("./lib/policies");
+const security = require("./lib/security");
 const { parseGatewayInference } = require("./lib/inference-config");
 const { getVersion } = require("./lib/version");
 const onboardSession = require("./lib/onboard-session");
@@ -79,6 +80,7 @@ const GLOBAL_COMMANDS = new Set([
   "stop",
   "status",
   "debug",
+  "security",
   "uninstall",
   "help",
   "--help",
@@ -1386,6 +1388,117 @@ async function sandboxDestroy(sandboxName, args = []) {
   console.log(`  ${G}✓${R} Sandbox '${sandboxName}' destroyed`);
 }
 
+function optionValue(args, flag, fallback = "") {
+  const idx = args.indexOf(flag);
+  if (idx === -1) return fallback;
+  const value = args[idx + 1];
+  if (!value || value.startsWith("--")) return fallback;
+  return value;
+}
+
+function securityHelp() {
+  console.log("");
+  console.log("  Security commands:");
+  console.log(`    ${preferredCmd("security policy validate [--file PATH]")}`);
+  console.log(`    ${preferredCmd("security events [--limit N] [--json] [--file PATH]")}`);
+  console.log(`    ${preferredCmd("security replay <event-id> [--file PATH]")}`);
+  console.log("");
+}
+
+function handleSecurityPolicyValidate(args) {
+  const policyPath = optionValue(args, "--file", security.defaultPolicyPath());
+  const result = security.validatePolicy(policyPath);
+  if (result.ok) {
+    console.log(`  ${G}✓${R} Security policy is valid: ${result.path}`);
+    for (const warning of result.warnings) {
+      console.log(`  ${YW}!${R} ${warning}`);
+    }
+    return;
+  }
+  console.error(`  Security policy validation failed: ${result.path}`);
+  for (const error of result.errors) {
+    console.error(`   - ${error}`);
+  }
+  process.exit(1);
+}
+
+function handleSecurityEvents(args) {
+  const limit = Number.parseInt(optionValue(args, "--limit", "50"), 10) || 50;
+  const eventsPath = optionValue(args, "--file", security.defaultEventsPath());
+  const asJson = args.includes("--json");
+  const { path: resolvedPath, events } = security.readEvents(eventsPath, limit);
+
+  if (asJson) {
+    console.log(JSON.stringify({ path: resolvedPath, events }, null, 2));
+    return;
+  }
+
+  console.log(`  Security events (${events.length}) from ${resolvedPath}`);
+  if (events.length === 0) {
+    console.log("  No events recorded yet.");
+    return;
+  }
+  for (const event of events) {
+    const ts = event.timestamp || "unknown-time";
+    const hook = event.hook || "unknown-hook";
+    const id = event.id || "unknown-id";
+    const action = event.effectiveAction || event.action || "allow";
+    const risk = event.riskLevel || "low";
+    const target = event.target || "unknown";
+    console.log(`  - ${ts}  ${hook}  ${action}  ${risk}  ${target}  (${id})`);
+  }
+}
+
+function handleSecurityReplay(args) {
+  const eventId = args[0];
+  if (!eventId || eventId.startsWith("--")) {
+    console.error("  Missing event ID. Usage: clawkeeper security replay <event-id> [--file PATH]");
+    process.exit(1);
+  }
+  const eventsPath = optionValue(args, "--file", security.defaultEventsPath());
+  const { path: resolvedPath, event } = security.replayEvent(eventId, eventsPath);
+  if (!event) {
+    console.error(`  Event not found in ${resolvedPath}: ${eventId}`);
+    process.exit(1);
+  }
+  console.log(`  Event: ${event.id}`);
+  console.log(`  Time: ${event.timestamp}`);
+  console.log(`  Hook: ${event.hook}`);
+  console.log(`  Action: ${event.effectiveAction || event.action}`);
+  console.log(`  Risk: ${event.riskLevel} (${event.riskScore})`);
+  console.log(`  Target: ${event.target}`);
+  console.log(`  Reason: ${event.reason}`);
+  if (Array.isArray(event.evidence) && event.evidence.length > 0) {
+    console.log("  Evidence:");
+    for (const item of event.evidence) {
+      console.log(`   - ${item.code}: ${item.message}`);
+    }
+  }
+}
+
+function securityCommand(args) {
+  const [sub, ...rest] = args;
+  if (!sub || sub === "help" || sub === "--help" || sub === "-h") {
+    securityHelp();
+    return;
+  }
+  if (sub === "policy" && rest[0] === "validate") {
+    handleSecurityPolicyValidate(rest);
+    return;
+  }
+  if (sub === "events") {
+    handleSecurityEvents(rest);
+    return;
+  }
+  if (sub === "replay") {
+    handleSecurityReplay(rest);
+    return;
+  }
+  console.error(`  Unknown security command: ${[sub, ...rest].join(" ")}`);
+  securityHelp();
+  process.exit(1);
+}
+
 // ── Help ─────────────────────────────────────────────────────────
 
 function help() {
@@ -1417,6 +1530,11 @@ function help() {
     ${preferredCmd("start")}                   Start auxiliary services ${D}(Telegram, tunnel)${R}
     ${preferredCmd("stop")}                    Stop all services
     ${preferredCmd("status")}                  Show sandbox list and service status
+
+  ${G}Security:${R}
+    ${preferredCmd("security policy validate [--file PATH]")}
+    ${preferredCmd("security events [--limit N] [--json] [--file PATH]")}
+    ${preferredCmd("security replay <event-id> [--file PATH]")}
 
   Troubleshooting:
     ${preferredCmd("debug [--quick]")}         Collect diagnostics for bug reports
@@ -1474,6 +1592,9 @@ const [cmd, ...args] = process.argv.slice(2);
         break;
       case "debug":
         debug(args);
+        break;
+      case "security":
+        securityCommand(args);
         break;
       case "uninstall":
         uninstall(args);

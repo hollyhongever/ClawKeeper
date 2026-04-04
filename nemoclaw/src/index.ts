@@ -17,6 +17,8 @@ import {
   describeOnboardProvider,
   loadOnboardConfig,
 } from "./onboard/config.js";
+import { registerSecurityHooks } from "./security/hooks.js";
+import type { PluginSecurityConfig, SecurityMode } from "./security/types.js";
 
 // ---------------------------------------------------------------------------
 // OpenClaw Plugin SDK compatible types (mirrors openclaw/plugin-sdk)
@@ -119,7 +121,7 @@ export interface OpenClawPluginApi {
   registerProvider: (provider: ProviderPlugin) => void;
   registerService: (service: PluginService) => void;
   resolvePath: (input: string) => string;
-  on: (hookName: string, handler: (...args: unknown[]) => void) => void;
+  on: (hookName: string, handler: (...args: unknown[]) => unknown) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -131,6 +133,22 @@ export interface NemoClawConfig {
   blueprintRegistry: string;
   sandboxName: string;
   inferenceProvider: string;
+  security: PluginSecurityConfig;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function pickMode(value: unknown, fallback: SecurityMode): SecurityMode {
+  if (value === "off" || value === "audit" || value === "enforce") return value;
+  return fallback;
+}
+
+function pickNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 function activeModelEntries(
@@ -206,10 +224,24 @@ const DEFAULT_PLUGIN_CONFIG: NemoClawConfig = {
   blueprintRegistry: "ghcr.io/nvidia/nemoclaw-blueprint",
   sandboxName: "openclaw",
   inferenceProvider: "nvidia",
+  security: {
+    mode: "enforce",
+    policyPath: "security-policy.yaml",
+    approvalTimeoutMs: 120000,
+    scanTimeoutMs: 30000,
+    alertWebhook: "",
+    quota: {
+      maxToolCallsPerMinute: 120,
+      maxInstallsPerHour: 20,
+      maxEstimatedTokensPerHour: 200000,
+    },
+  },
 };
 
 export function getPluginConfig(api: OpenClawPluginApi): NemoClawConfig {
   const raw = api.pluginConfig ?? {};
+  const securityRaw = asRecord(raw["security"]);
+  const quotaRaw = asRecord(securityRaw["quota"]);
   return {
     blueprintVersion:
       typeof raw["blueprintVersion"] === "string"
@@ -227,6 +259,39 @@ export function getPluginConfig(api: OpenClawPluginApi): NemoClawConfig {
       typeof raw["inferenceProvider"] === "string"
         ? raw["inferenceProvider"]
         : DEFAULT_PLUGIN_CONFIG.inferenceProvider,
+    security: {
+      mode: pickMode(securityRaw["mode"], DEFAULT_PLUGIN_CONFIG.security.mode),
+      policyPath:
+        typeof securityRaw["policyPath"] === "string"
+          ? securityRaw["policyPath"]
+          : DEFAULT_PLUGIN_CONFIG.security.policyPath,
+      approvalTimeoutMs: pickNumber(
+        securityRaw["approvalTimeoutMs"],
+        DEFAULT_PLUGIN_CONFIG.security.approvalTimeoutMs,
+      ),
+      scanTimeoutMs: pickNumber(
+        securityRaw["scanTimeoutMs"],
+        DEFAULT_PLUGIN_CONFIG.security.scanTimeoutMs,
+      ),
+      alertWebhook:
+        typeof securityRaw["alertWebhook"] === "string"
+          ? securityRaw["alertWebhook"]
+          : DEFAULT_PLUGIN_CONFIG.security.alertWebhook,
+      quota: {
+        maxToolCallsPerMinute: pickNumber(
+          quotaRaw["maxToolCallsPerMinute"],
+          DEFAULT_PLUGIN_CONFIG.security.quota.maxToolCallsPerMinute,
+        ),
+        maxInstallsPerHour: pickNumber(
+          quotaRaw["maxInstallsPerHour"],
+          DEFAULT_PLUGIN_CONFIG.security.quota.maxInstallsPerHour,
+        ),
+        maxEstimatedTokensPerHour: pickNumber(
+          quotaRaw["maxEstimatedTokensPerHour"],
+          DEFAULT_PLUGIN_CONFIG.security.quota.maxEstimatedTokensPerHour,
+        ),
+      },
+    },
   };
 }
 
@@ -235,6 +300,8 @@ export function getPluginConfig(api: OpenClawPluginApi): NemoClawConfig {
 // ---------------------------------------------------------------------------
 
 export default function register(api: OpenClawPluginApi): void {
+  const pluginCfg = getPluginConfig(api);
+
   // 1. Register slash commands (chat interface)
   api.registerCommand({
     name: "clawkeeper",
@@ -254,6 +321,9 @@ export default function register(api: OpenClawPluginApi): void {
   const providerCredentialEnv = onboardCfg?.credentialEnv ?? "NVIDIA_API_KEY";
   api.registerProvider(registeredProviderForConfig(onboardCfg, providerCredentialEnv));
 
+  // 3. Register semantic security hooks
+  registerSecurityHooks(api, pluginCfg);
+
   const bannerEndpoint = onboardCfg ? describeOnboardEndpoint(onboardCfg) : "build.nvidia.com";
   const bannerProvider = onboardCfg ? describeOnboardProvider(onboardCfg) : "NVIDIA Endpoints";
   const bannerModel = onboardCfg?.model ?? "nvidia/nemotron-3-super-120b-a12b";
@@ -265,6 +335,7 @@ export default function register(api: OpenClawPluginApi): void {
   api.logger.info(`  │  Endpoint:  ${bannerEndpoint.padEnd(40)}│`);
   api.logger.info(`  │  Provider:  ${bannerProvider.padEnd(40)}│`);
   api.logger.info(`  │  Model:     ${bannerModel.padEnd(40)}│`);
+  api.logger.info(`  │  Security:  ${pluginCfg.security.mode.padEnd(40)}│`);
   api.logger.info("  │  Slash:     /clawkeeper (alias: /nemoclaw)          │");
   api.logger.info("  └─────────────────────────────────────────────────────┘");
   api.logger.info("");

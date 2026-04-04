@@ -1,0 +1,62 @@
+---
+title:
+  page: "ClawKeeper Security Module Updates"
+  nav: "Security Module Updates"
+description:
+  main: "Changelog for ClawKeeper security module implementation milestones and behavior changes."
+  agent: "Tracks ClawKeeper security module updates over time. Use when auditing what changed in hooks, policy, CLI security commands, and test coverage."
+keywords: ["clawkeeper security changelog", "security module updates", "before_tool_call updates"]
+topics: ["generative_ai", "ai_agents"]
+tags: ["openclaw", "openshell", "security", "changelog"]
+content:
+  type: reference
+  difficulty: intermediate
+  audience: ["developer", "engineer", "security_engineer"]
+status: published
+---
+
+<!--
+  SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+# ClawKeeper Security Module Updates
+
+This page records implementation updates for the ClawKeeper security module.
+Use it as the release log for security milestones after the baseline plan is approved.
+
+## 2026-04-04
+
+### Added
+
+- Added the security enhancement implementation blueprint page and connected it to the Security docs navigation.
+- Added plugin security config namespace in `openclaw.plugin.json` and runtime parsing in plugin registration.
+- Added security policy file support (`security-policy.yaml`) with defaults and fallback behavior.
+- Added hook-based semantic controls for `before_tool_call`, `after_tool_call`, and `before_install`.
+- Added rule-based risk evaluation across command, path, network, prompt-signal, and quota dimensions.
+- Added install-time admission evaluation with offline-first scanning patterns and optional external scanner command support.
+- Added structured audit event output (`security-event.v1`) to JSONL and optional webhook alert delivery.
+- Added CLI security commands:
+  - `clawkeeper security policy validate`
+  - `clawkeeper security events`
+  - `clawkeeper security replay`
+- Added hardened policy template files for strict egress and sensitive path read-only posture.
+- Added tests for security engine behavior, security CLI workflows, plugin hook registration, and config parsing.
+
+### Changed
+
+- Updated help output to include security command group and usage examples.
+- Updated command reference docs with new security command documentation.
+- Updated Security toctree with the plan page and this update log page.
+
+### Validation Snapshot
+
+- Plugin package checks pass (`npm run check` under `nemoclaw/`).
+- Plugin project test suite passes.
+- Security-focused CLI and engine tests pass.
+- Core CLI regression tests still pass for existing flows.
+
+## Next Steps
+
+- Continue appending future security changes here with exact dates and concise impact notes.
+- Keep each entry grouped into `Added`, `Changed`, and `Validation Snapshot` for consistent release review.

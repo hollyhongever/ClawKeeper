@@ -43,6 +43,7 @@
   },
   "files": [
     "dist/",
-    "openclaw.plugin.json"
+    "openclaw.plugin.json",
+    "security-policy.yaml"
   ]
 }

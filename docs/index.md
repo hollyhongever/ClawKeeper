@@ -249,6 +249,8 @@ Customize the Network Policy <network-policy/customize-network-policy>
 :hidden:
 
 Security Best Practices <security/best-practices>
+ClawKeeper Security Enhancement Plan <security/clawkeeper-security-enhancement-plan>
+Security Module Updates <security/security-module-updates>
 ```
 
 ```{toctree}

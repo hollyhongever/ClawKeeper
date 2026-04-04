@@ -25,6 +25,58 @@
         "type": "string",
         "description": "Default inference provider type (nvidia, vllm, openai-compatible)",
         "default": "nvidia"
+      },
+      "security": {
+        "type": "object",
+        "description": "Semantic security controls for hook-based action arbitration",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "description": "Security enforcement mode",
+            "enum": ["off", "audit", "enforce"],
+            "default": "enforce"
+          },
+          "policyPath": {
+            "type": "string",
+            "description": "Path to security-policy.yaml (relative to plugin root or absolute path)",
+            "default": "security-policy.yaml"
+          },
+          "approvalTimeoutMs": {
+            "type": "number",
+            "description": "Maximum wait for approval-mediated decisions in milliseconds",
+            "default": 120000
+          },
+          "scanTimeoutMs": {
+            "type": "number",
+            "description": "Timeout in milliseconds for install-time external scanner calls",
+            "default": 30000
+          },
+          "alertWebhook": {
+            "type": "string",
+            "description": "Optional webhook endpoint for security alert delivery",
+            "default": ""
+          },
+          "quota": {
+            "type": "object",
+            "description": "Runtime quota guardrails used by the security engine",
+            "properties": {
+              "maxToolCallsPerMinute": {
+                "type": "number",
+                "default": 120
+              },
+              "maxInstallsPerHour": {
+                "type": "number",
+                "default": 20
+              },
+              "maxEstimatedTokensPerHour": {
+                "type": "number",
+                "default": 200000
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
       }
     },
     "additionalProperties": false

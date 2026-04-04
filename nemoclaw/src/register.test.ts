@@ -45,7 +45,7 @@ describe("plugin registration", () => {
   it("registers slash commands with a legacy alias", () => {
     const api = createMockApi();
     register(api);
-    const registered = vi.mocked(api.registerCommand).mock.calls.map((call) => call[0]?.name);
+    const registered = vi.mocked(api.registerCommand).mock.calls.map((call) => call[0].name);
     expect(registered).toContain("clawkeeper");
     expect(registered).toContain("nemoclaw");
   });
@@ -54,6 +54,15 @@ describe("plugin registration", () => {
     const api = createMockApi();
     register(api);
     expect(api.registerProvider).toHaveBeenCalledWith(expect.objectContaining({ id: "inference" }));
+  });
+
+  it("registers security hooks", () => {
+    const api = createMockApi();
+    register(api);
+    const hookNames = vi.mocked(api.on).mock.calls.map((call) => call[0]);
+    expect(hookNames).toContain("before_tool_call");
+    expect(hookNames).toContain("after_tool_call");
+    expect(hookNames).toContain("before_install");
   });
 
   it("does NOT register CLI commands", () => {
@@ -90,6 +99,12 @@ describe("getPluginConfig", () => {
     expect(config.blueprintRegistry).toBe("ghcr.io/nvidia/nemoclaw-blueprint");
     expect(config.sandboxName).toBe("openclaw");
     expect(config.inferenceProvider).toBe("nvidia");
+    expect(config.security.mode).toBe("enforce");
+    expect(config.security.policyPath).toBe("security-policy.yaml");
+    expect(config.security.approvalTimeoutMs).toBe(120000);
+    expect(config.security.scanTimeoutMs).toBe(30000);
+    expect(config.security.alertWebhook).toBe("");
+    expect(config.security.quota.maxToolCallsPerMinute).toBe(120);
   });
 
   it("returns defaults when pluginConfig has non-string values", () => {
@@ -98,6 +113,7 @@ describe("getPluginConfig", () => {
     const config = getPluginConfig(api);
     expect(config.blueprintVersion).toBe("latest");
     expect(config.sandboxName).toBe("openclaw");
+    expect(config.security.mode).toBe("enforce");
   });
 
   it("uses string values from pluginConfig", () => {
@@ -107,11 +123,31 @@ describe("getPluginConfig", () => {
       blueprintRegistry: "ghcr.io/custom/registry",
       sandboxName: "custom-sandbox",
       inferenceProvider: "openai",
+      security: {
+        mode: "audit",
+        policyPath: "/tmp/security-policy.yaml",
+        approvalTimeoutMs: 90000,
+        scanTimeoutMs: 10000,
+        alertWebhook: "https://alerts.example.com/hook",
+        quota: {
+          maxToolCallsPerMinute: 10,
+          maxInstallsPerHour: 2,
+          maxEstimatedTokensPerHour: 5000,
+        },
+      },
     };
     const config = getPluginConfig(api);
     expect(config.blueprintVersion).toBe("2.0.0");
     expect(config.blueprintRegistry).toBe("ghcr.io/custom/registry");
     expect(config.sandboxName).toBe("custom-sandbox");
     expect(config.inferenceProvider).toBe("openai");
+    expect(config.security.mode).toBe("audit");
+    expect(config.security.policyPath).toBe("/tmp/security-policy.yaml");
+    expect(config.security.approvalTimeoutMs).toBe(90000);
+    expect(config.security.scanTimeoutMs).toBe(10000);
+    expect(config.security.alertWebhook).toBe("https://alerts.example.com/hook");
+    expect(config.security.quota.maxToolCallsPerMinute).toBe(10);
+    expect(config.security.quota.maxInstallsPerHour).toBe(2);
+    expect(config.security.quota.maxEstimatedTokensPerHour).toBe(5000);
   });
 });

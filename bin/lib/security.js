@@ -76,39 +76,137 @@ function camelCase(value) {
   return String(value).replace(/_([a-z])/g, (_, ch) => ch.toUpperCase());
 }
 
-function readEvents(filePath = defaultEventsPath(), limit = 50) {
+function normalizeEvent(rawEvent, lineNo) {
+  if (!rawEvent || typeof rawEvent !== "object" || Array.isArray(rawEvent)) return null;
+  const event = { ...rawEvent };
+  event._line = lineNo;
+  event.id = typeof event.id === "string" ? event.id : `line-${lineNo}`;
+  event.hook = typeof event.hook === "string" ? event.hook : "unknown-hook";
+  event.action =
+    typeof event.effectiveAction === "string"
+      ? event.effectiveAction
+      : typeof event.action === "string"
+        ? event.action
+        : "allow";
+  event.riskLevel = typeof event.riskLevel === "string" ? event.riskLevel : "low";
+  event.target = typeof event.target === "string" ? event.target : "unknown";
+  event.timestamp = typeof event.timestamp === "string" ? event.timestamp : "";
+  return event;
+}
+
+function readEvents(filePath = defaultEventsPath(), options = {}) {
   const resolved = path.resolve(filePath);
   if (!fs.existsSync(resolved)) {
-    return { path: resolved, events: [] };
+    return {
+      path: resolved,
+      events: [],
+      totalEvents: 0,
+      returnedEvents: 0,
+      malformedLines: 0,
+      filters: {},
+    };
   }
+
+  const normalizedOptions =
+    typeof options === "number"
+      ? { limit: options }
+      : options && typeof options === "object"
+        ? options
+        : {};
+  const limit = Math.max(1, Number.parseInt(String(normalizedOptions.limit ?? 50), 10) || 50);
+  const actionFilter =
+    typeof normalizedOptions.action === "string" ? normalizedOptions.action.trim() : "";
+  const hookFilter = typeof normalizedOptions.hook === "string" ? normalizedOptions.hook.trim() : "";
+  const riskFilter = typeof normalizedOptions.risk === "string" ? normalizedOptions.risk.trim() : "";
+  const idFilter = typeof normalizedOptions.id === "string" ? normalizedOptions.id.trim() : "";
 
   const lines = fs
     .readFileSync(resolved, "utf-8")
     .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
+    .map((line, index) => ({ line: line.trim(), lineNo: index + 1 }))
+    .filter((entry) => entry.line.length > 0);
 
-  const events = [];
-  for (const line of lines) {
+  let malformedLines = 0;
+  const allEvents = [];
+  for (const { line, lineNo } of lines) {
     try {
-      const event = JSON.parse(line);
-      if (event && typeof event === "object" && !Array.isArray(event)) {
-        events.push(event);
+      const parsed = JSON.parse(line);
+      const event = normalizeEvent(parsed, lineNo);
+      if (event) {
+        allEvents.push(event);
+      } else {
+        malformedLines += 1;
       }
     } catch {
       // Ignore malformed lines to keep event browsing resilient.
+      malformedLines += 1;
     }
   }
 
-  const bounded = Math.max(1, Number.parseInt(String(limit), 10) || 50);
-  return { path: resolved, events: events.slice(-bounded).reverse() };
+  allEvents.sort((a, b) => {
+    const at = a.timestamp || "";
+    const bt = b.timestamp || "";
+    if (at === bt) return b._line - a._line;
+    return bt.localeCompare(at);
+  });
+
+  let filtered = allEvents;
+  if (actionFilter) filtered = filtered.filter((event) => event.action === actionFilter);
+  if (hookFilter) filtered = filtered.filter((event) => event.hook === hookFilter);
+  if (riskFilter) filtered = filtered.filter((event) => event.riskLevel === riskFilter);
+  if (idFilter) filtered = filtered.filter((event) => String(event.id).includes(idFilter));
+
+  const events = filtered.slice(0, limit);
+  return {
+    path: resolved,
+    events,
+    totalEvents: allEvents.length,
+    returnedEvents: events.length,
+    malformedLines,
+    filters: {
+      action: actionFilter || null,
+      hook: hookFilter || null,
+      risk: riskFilter || null,
+      id: idFilter || null,
+      limit,
+    },
+  };
 }
 
 function replayEvent(eventId, filePath = defaultEventsPath()) {
   const resolved = path.resolve(filePath);
-  const { events } = readEvents(resolved, Number.MAX_SAFE_INTEGER);
-  const event = events.find((entry) => entry.id === eventId) || null;
-  return { path: resolved, event };
+  const { events, totalEvents, malformedLines } = readEvents(resolved, {
+    limit: Number.MAX_SAFE_INTEGER,
+  });
+  const exact = events.filter((entry) => entry.id === eventId);
+  if (exact.length > 0) {
+    return {
+      path: resolved,
+      event: exact[0],
+      matches: exact.length,
+      totalEvents,
+      malformedLines,
+    };
+  }
+
+  const prefix = events.filter((entry) => String(entry.id).startsWith(eventId));
+  if (prefix.length === 1) {
+    return {
+      path: resolved,
+      event: prefix[0],
+      matches: 1,
+      totalEvents,
+      malformedLines,
+    };
+  }
+
+  return {
+    path: resolved,
+    event: null,
+    matches: prefix.length,
+    totalEvents,
+    malformedLines,
+  };
 }
 
 module.exports = {

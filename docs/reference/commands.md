@@ -236,16 +236,36 @@ Print recent structured security events from the JSONL audit log.
 By default this reads `~/.nemoclaw/security/events.jsonl`.
 
 ```console
-$ clawkeeper security events [--limit <n>] [--json] [--file <path>]
+$ clawkeeper security events [--limit <n>] [--action <name>] [--hook <name>] [--risk <level>] [--id <pattern>] [--json] [--file <path>]
 ```
+
+Use filters to narrow event lists for demos and incident triage.
+Malformed JSONL records are skipped so listing remains resilient, and the CLI reports how many malformed lines were ignored.
+
+| Flag | Description |
+|------|-------------|
+| `--limit <n>` | Maximum number of matching events to print (default: `50`) |
+| `--action <name>` | Filter by effective action (`allow`, `block`, `require_approval`) |
+| `--hook <name>` | Filter by hook name (for example `before_tool_call`) |
+| `--risk <level>` | Filter by risk level (`low`, `medium`, `high`, `critical`) |
+| `--id <pattern>` | Filter by event ID substring match |
+| `--json` | Print structured JSON output including filters and malformed-line count |
+| `--file <path>` | Read from an alternate JSONL audit log file |
 
 ### `clawkeeper security replay`
 
 Show full details for a single security event by ID.
+Replay first checks exact IDs, then falls back to ID prefix matching.
+If the provided prefix is ambiguous (matches multiple events), the command exits non-zero.
 
 ```console
-$ clawkeeper security replay <event-id> [--file <path>]
+$ clawkeeper security replay <event-id> [--json] [--file <path>]
 ```
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Print replay result as JSON (includes dataset totals and match count) |
+| `--file <path>` | Read from an alternate JSONL audit log file |
 
 ### `clawkeeper setup-spark`
 

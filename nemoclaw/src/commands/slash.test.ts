@@ -29,12 +29,12 @@ const mockedLoadOnboardConfig = vi.mocked(loadOnboardConfig);
 const mockedDescribeOnboardEndpoint = vi.mocked(describeOnboardEndpoint);
 const mockedDescribeOnboardProvider = vi.mocked(describeOnboardProvider);
 
-function makeCtx(args?: string): PluginCommandContext {
+function makeCtx(args?: string, slashCommand = "clawkeeper"): PluginCommandContext {
   return {
     channel: "test-channel",
     isAuthorizedSender: true,
     args,
-    commandBody: `/nemoclaw${args ? ` ${args}` : ""}`,
+    commandBody: `/${slashCommand}${args ? ` ${args}` : ""}`,
     config: {},
   };
 }
@@ -42,7 +42,7 @@ function makeCtx(args?: string): PluginCommandContext {
 function makeApi(): OpenClawPluginApi {
   return {
     id: "nemoclaw",
-    name: "NemoClaw",
+    name: "ClawKeeper",
     config: {},
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
     registerCommand: vi.fn(),
@@ -80,7 +80,8 @@ describe("commands/slash", () => {
   describe("help", () => {
     it("returns help text for empty args", () => {
       const result = handleSlashCommand(makeCtx(), makeApi());
-      expect(result.text).toContain("NemoClaw");
+      expect(result.text).toContain("ClawKeeper");
+      expect(result.text).toContain("Legacy alias: `/nemoclaw");
       expect(result.text).toContain("Subcommands:");
       expect(result.text).toContain("status");
       expect(result.text).toContain("eject");
@@ -144,7 +145,7 @@ describe("commands/slash", () => {
   describe("eject", () => {
     it("reports nothing to eject when state is blank", () => {
       const result = handleSlashCommand(makeCtx("eject"), makeApi());
-      expect(result.text).toContain("No NemoClaw deployment found");
+      expect(result.text).toContain("No ClawKeeper deployment found");
     });
 
     it("reports manual rollback required when no snapshot exists", () => {
@@ -174,8 +175,8 @@ describe("commands/slash", () => {
         updatedAt: "2026-03-01T00:00:00.000Z",
       });
       const result = handleSlashCommand(makeCtx("eject"), makeApi());
-      expect(result.text).toContain("Eject from NemoClaw");
-      expect(result.text).toContain("nemoclaw <name> destroy");
+      expect(result.text).toContain("Eject from ClawKeeper");
+      expect(result.text).toContain("clawkeeper <name> destroy");
       expect(result.text).toContain("Snapshot: /snapshots/snap-001");
     });
 
@@ -203,7 +204,7 @@ describe("commands/slash", () => {
     it("shows setup instructions when no config exists", () => {
       const result = handleSlashCommand(makeCtx("onboard"), makeApi());
       expect(result.text).toContain("No configuration found");
-      expect(result.text).toContain("nemoclaw onboard");
+      expect(result.text).toContain("clawkeeper onboard");
     });
 
     it("shows onboard status when config exists", () => {
@@ -220,7 +221,7 @@ describe("commands/slash", () => {
       mockedDescribeOnboardEndpoint.mockReturnValue("build (https://api.build.nvidia.com/v1)");
       mockedDescribeOnboardProvider.mockReturnValue("NVIDIA Endpoint API");
       const result = handleSlashCommand(makeCtx("onboard"), makeApi());
-      expect(result.text).toContain("NemoClaw Onboard Status");
+      expect(result.text).toContain("ClawKeeper Onboard Status");
       expect(result.text).toContain("NVIDIA Endpoint API");
       expect(result.text).toContain("nvidia/nemotron-3-super-120b-a12b");
       expect(result.text).toContain("NVIDIA_API_KEY");
@@ -241,6 +242,14 @@ describe("commands/slash", () => {
       mockedDescribeOnboardProvider.mockReturnValue("NVIDIA Cloud Partner");
       const result = handleSlashCommand(makeCtx("onboard"), makeApi());
       expect(result.text).toContain("NCP Partner: PartnerCo");
+    });
+  });
+
+  describe("legacy slash alias", () => {
+    it("returns the same help body for /nemoclaw and /clawkeeper", () => {
+      const legacy = handleSlashCommand(makeCtx(undefined, "nemoclaw"), makeApi());
+      const primary = handleSlashCommand(makeCtx(undefined, "clawkeeper"), makeApi());
+      expect(legacy.text).toBe(primary.text);
     });
   });
 });

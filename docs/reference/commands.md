@@ -1,13 +1,13 @@
 ---
 title:
-  page: "NemoClaw CLI Commands Reference"
+  page: "ClawKeeper CLI Commands Reference"
   nav: "Commands"
 description:
-  main: "Full CLI reference for slash commands and standalone NemoClaw commands."
-  agent: "Lists all slash commands and standalone NemoClaw CLI commands. Use when looking up a command, checking command syntax, or browsing the CLI reference."
-keywords: ["nemoclaw cli commands", "nemoclaw command reference"]
+  main: "Full CLI reference for slash commands and standalone ClawKeeper commands."
+  agent: "Lists all slash commands and standalone ClawKeeper CLI commands. Use when looking up a command, checking command syntax, or browsing the CLI reference."
+keywords: ["clawkeeper cli commands", "clawkeeper command reference", "nemoclaw compatibility alias"]
 topics: ["generative_ai", "ai_agents"]
-tags: ["openclaw", "openshell", "nemoclaw", "cli"]
+tags: ["openclaw", "openshell", "clawkeeper", "cli", "nemoclaw"]
 content:
   type: reference
   difficulty: technical_beginner
@@ -22,77 +22,79 @@ status: published
 
 # Commands
 
-The `nemoclaw` CLI is the primary interface for managing NemoClaw sandboxes. It is installed when you run `npm install -g nemoclaw`.
+The `clawkeeper` CLI is the primary interface for managing ClawKeeper sandboxes.
+Legacy alias: `nemoclaw` is still supported for compatibility.
 
-## `/nemoclaw` Slash Command
+## `/clawkeeper` Slash Command
 
-The `/nemoclaw` slash command is available inside the OpenClaw chat interface for quick actions:
+The `/clawkeeper` slash command is available inside the OpenClaw chat interface for quick actions.
+Legacy alias: `/nemoclaw`.
 
 | Subcommand | Description |
 |---|---|
-| `/nemoclaw` | Show slash-command help and host CLI pointers |
-| `/nemoclaw status` | Show sandbox and inference state |
-| `/nemoclaw onboard` | Show onboarding status and reconfiguration guidance |
-| `/nemoclaw eject` | Show rollback instructions for returning to the host installation |
+| `/clawkeeper` | Show slash-command help and host CLI pointers |
+| `/clawkeeper status` | Show sandbox and inference state |
+| `/clawkeeper onboard` | Show onboarding status and reconfiguration guidance |
+| `/clawkeeper eject` | Show rollback instructions for returning to the host installation |
 
 ## Standalone Host Commands
 
-The `nemoclaw` binary handles host-side operations that run outside the OpenClaw plugin context.
+The `clawkeeper` binary handles host-side operations that run outside the OpenClaw plugin context.
 
-### `nemoclaw help`, `nemoclaw --help`, `nemoclaw -h`
+### `clawkeeper help`, `clawkeeper --help`, `clawkeeper -h`
 
 Show the top-level usage summary and command groups.
-Running `nemoclaw` with no arguments shows the same help output.
+Running `clawkeeper` with no arguments shows the same help output.
 
 ```console
-$ nemoclaw help
+$ clawkeeper help
 ```
 
-### `nemoclaw --version`, `nemoclaw -v`
+### `clawkeeper --version`, `clawkeeper -v`
 
-Print the installed NemoClaw CLI version.
+Print the installed ClawKeeper CLI version.
 
 ```console
-$ nemoclaw --version
+$ clawkeeper --version
 ```
 
-### `nemoclaw onboard`
+### `clawkeeper onboard`
 
 Run the interactive setup wizard (recommended for new installs).
 The wizard creates an OpenShell gateway, registers inference providers, builds the sandbox image, and creates the sandbox.
 Use this command for new installs and for recreating a sandbox after changes to policy or configuration.
 
 ```console
-$ nemoclaw onboard
+$ clawkeeper onboard
 ```
 
 The wizard prompts for a provider first, then collects the provider credential if needed.
 Supported non-experimental choices include NVIDIA Endpoints, OpenAI, Anthropic, Google Gemini, and compatible OpenAI or Anthropic endpoints.
 Credentials are stored in `~/.nemoclaw/credentials.json`.
-The legacy `nemoclaw setup` command is deprecated; use `nemoclaw onboard` instead.
+The legacy `nemoclaw setup` command is deprecated; use `clawkeeper onboard` instead.
 
-If you enable Brave Search during onboarding, NemoClaw currently stores the Brave API key in the sandbox's OpenClaw configuration.
+If you enable Brave Search during onboarding, ClawKeeper currently stores the Brave API key in the sandbox's OpenClaw configuration.
 That means the OpenClaw agent can read the key.
-NemoClaw explores an OpenShell-hosted credential path first, but the current OpenClaw Brave runtime does not consume that path end to end yet.
+ClawKeeper explores an OpenShell-hosted credential path first, but the current OpenClaw Brave runtime does not consume that path end to end yet.
 Treat Brave Search as an explicit opt-in and use a dedicated low-privilege Brave key.
 
 For non-interactive onboarding, you must explicitly accept the third-party software notice:
 
 ```console
-$ nemoclaw onboard --non-interactive --yes-i-accept-third-party-software
+$ clawkeeper onboard --non-interactive --yes-i-accept-third-party-software
 ```
 
 or:
 
 ```console
-$ NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 nemoclaw onboard --non-interactive
+$ CLAWKEEPER_ACCEPT_THIRD_PARTY_SOFTWARE=1 clawkeeper onboard --non-interactive
 ```
 
 To enable Brave Search in non-interactive mode, set:
 
 ```console
 $ BRAVE_API_KEY=... \
-  nemoclaw onboard --non-interactive
+  clawkeeper onboard --non-interactive
 ```
 
 `BRAVE_API_KEY` enables Brave Search in non-interactive mode and also enables `web_fetch`.
@@ -104,53 +106,53 @@ Uppercase letters are automatically lowercased.
 Before creating the gateway, the wizard runs preflight checks.
 On systems with cgroup v2 (Ubuntu 24.04, DGX Spark, WSL2), it verifies that Docker is configured with `"default-cgroupns-mode": "host"` and provides fix instructions if the setting is missing.
 
-### `nemoclaw list`
+### `clawkeeper list`
 
 List all registered sandboxes with their model, provider, and policy presets.
 
 ```console
-$ nemoclaw list
+$ clawkeeper list
 ```
 
-### `nemoclaw deploy`
+### `clawkeeper deploy`
 
 :::{warning}
-The `nemoclaw deploy` command is experimental and may not work as expected.
+The `clawkeeper deploy` command is experimental and may not work as expected.
 :::
 
-Deploy NemoClaw to a remote GPU instance through [Brev](https://brev.nvidia.com).
-The deploy script installs Docker, NVIDIA Container Toolkit if a GPU is present, and OpenShell on the VM, then runs `nemoclaw onboard` and connects to the sandbox.
+Deploy ClawKeeper to a remote GPU instance through [Brev](https://brev.nvidia.com).
+The deploy script installs Docker, NVIDIA Container Toolkit if a GPU is present, and OpenShell on the VM, then runs `clawkeeper onboard` and connects to the sandbox.
 
 ```console
-$ nemoclaw deploy <instance-name>
+$ clawkeeper deploy <instance-name>
 ```
 
-### `nemoclaw <name> connect`
+### `clawkeeper <name> connect`
 
 Connect to a sandbox by name.
 
 ```console
-$ nemoclaw my-assistant connect
+$ clawkeeper my-assistant connect
 ```
 
-### `nemoclaw <name> status`
+### `clawkeeper <name> status`
 
 Show sandbox status, health, and inference configuration.
 
 ```console
-$ nemoclaw my-assistant status
+$ clawkeeper my-assistant status
 ```
 
-### `nemoclaw <name> logs`
+### `clawkeeper <name> logs`
 
 View sandbox logs.
 Use `--follow` to stream output in real time.
 
 ```console
-$ nemoclaw my-assistant logs [--follow]
+$ clawkeeper my-assistant logs [--follow]
 ```
 
-### `nemoclaw <name> destroy`
+### `clawkeeper <name> destroy`
 
 Stop the NIM container and delete the sandbox.
 This removes the sandbox from the registry.
@@ -162,24 +164,24 @@ Back up your workspace first by following the instructions at [Back Up and Resto
 :::
 
 ```console
-$ nemoclaw my-assistant destroy
+$ clawkeeper my-assistant destroy
 ```
 
-### `nemoclaw <name> policy-add`
+### `clawkeeper <name> policy-add`
 
 Add a policy preset to a sandbox.
 Presets extend the baseline network policy with additional endpoints.
 
 ```console
-$ nemoclaw my-assistant policy-add
+$ clawkeeper my-assistant policy-add
 ```
 
-### `nemoclaw <name> policy-list`
+### `clawkeeper <name> policy-list`
 
 List available policy presets and show which ones are applied to the sandbox.
 
 ```console
-$ nemoclaw my-assistant policy-list
+$ clawkeeper my-assistant policy-list
 ```
 
 ### `openshell term`
@@ -193,51 +195,51 @@ $ openshell term
 
 For a remote Brev instance, SSH to the instance and run `openshell term` there, or use a port-forward to the gateway.
 
-### `nemoclaw start`
+### `clawkeeper start`
 
 Start auxiliary services, such as the Telegram bridge and cloudflared tunnel.
 
 ```console
-$ nemoclaw start
+$ clawkeeper start
 ```
 
 Requires `TELEGRAM_BOT_TOKEN` for the Telegram bridge.
 
-### `nemoclaw stop`
+### `clawkeeper stop`
 
 Stop all auxiliary services.
 
 ```console
-$ nemoclaw stop
+$ clawkeeper stop
 ```
 
-### `nemoclaw status`
+### `clawkeeper status`
 
 Show the sandbox list and the status of auxiliary services.
 
 ```console
-$ nemoclaw status
+$ clawkeeper status
 ```
 
-### `nemoclaw setup-spark`
+### `clawkeeper setup-spark`
 
-Set up NemoClaw on DGX Spark.
+Set up ClawKeeper on DGX Spark.
 This command applies cgroup v2 and Docker fixes required for Ubuntu 24.04.
 Run with `sudo` on the Spark host.
-After the fixes complete, the script prompts you to run `nemoclaw onboard` to continue setup.
+After the fixes complete, the script prompts you to run `clawkeeper onboard` to continue setup.
 
 ```console
-$ sudo nemoclaw setup-spark
+$ sudo clawkeeper setup-spark
 ```
 
-### `nemoclaw debug`
+### `clawkeeper debug`
 
 Collect diagnostics for bug reports.
 Gathers system info, Docker state, gateway logs, and sandbox status into a summary or tarball.
 Use `--sandbox <name>` to target a specific sandbox, `--quick` for a smaller snapshot, or `--output <path>` to save a tarball that you can attach to an issue.
 
 ```console
-$ nemoclaw debug [--quick] [--sandbox NAME] [--output PATH]
+$ clawkeeper debug [--quick] [--sandbox NAME] [--output PATH]
 ```
 
 | Flag | Description |
@@ -246,25 +248,25 @@ $ nemoclaw debug [--quick] [--sandbox NAME] [--output PATH]
 | `--sandbox NAME` | Target a specific sandbox (default: auto-detect) |
 | `--output PATH` | Write diagnostics tarball to the given path |
 
-### `nemoclaw uninstall`
+### `clawkeeper uninstall`
 
-Run `uninstall.sh` to remove NemoClaw sandboxes, gateway resources, related images and containers, and local state.
+Run `uninstall.sh` to remove ClawKeeper sandboxes, gateway resources, related images and containers, and local state.
 The CLI uses the local `uninstall.sh` first and falls back to the hosted script if the local file is unavailable.
 
 | Flag | Effect |
 |---|---|
 | `--yes` | Skip the confirmation prompt |
 | `--keep-openshell` | Leave the `openshell` binary installed |
-| `--delete-models` | Also remove NemoClaw-pulled Ollama models |
+| `--delete-models` | Also remove ClawKeeper-pulled Ollama models |
 
 ```console
-$ nemoclaw uninstall [--yes] [--keep-openshell] [--delete-models]
+$ clawkeeper uninstall [--yes] [--keep-openshell] [--delete-models]
 ```
 
-### Legacy `nemoclaw setup`
+### Legacy `nemoclaw` Compatibility
 
-Deprecated. Use `nemoclaw onboard` instead.
-Running `nemoclaw setup` now delegates directly to `nemoclaw onboard`.
+`nemoclaw` remains available as a compatibility alias for `clawkeeper`.
+Deprecated `nemoclaw setup` delegates directly to `clawkeeper onboard`.
 
 ```console
 $ nemoclaw setup

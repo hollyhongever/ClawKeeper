@@ -3,7 +3,8 @@
 //
 // Interactive onboarding wizard — 7 steps from zero to running sandbox.
 // Supports non-interactive mode via --non-interactive flag or
-// NEMOCLAW_NON_INTERACTIVE=1 env var for CI/CD pipelines.
+// NEMOCLAW_NON_INTERACTIVE=1 / CLAWKEEPER_NON_INTERACTIVE=1 env vars
+// for CI/CD pipelines.
 
 const fs = require("fs");
 const os = require("os");
@@ -85,6 +86,32 @@ function cleanupTempDir(filePath, expectedPrefix) {
     fs.rmSync(parentDir, { recursive: true, force: true });
   }
 }
+
+// Compatibility bridge for the first ClawKeeper branding phase.
+// Legacy NEMOCLAW_* still wins when both are set.
+const CLAWKEEPER_COMPAT_ENV_SUFFIXES = [
+  "NON_INTERACTIVE",
+  "ACCEPT_THIRD_PARTY_SOFTWARE",
+  "SANDBOX_NAME",
+  "PROVIDER",
+  "MODEL",
+  "POLICY_MODE",
+  "POLICY_PRESETS",
+  "RECREATE_SANDBOX",
+  "ENDPOINT_URL",
+];
+
+function applyClawkeeperCompatEnv() {
+  for (const suffix of CLAWKEEPER_COMPAT_ENV_SUFFIXES) {
+    const legacy = `NEMOCLAW_${suffix}`;
+    const branded = `CLAWKEEPER_${suffix}`;
+    if (process.env[legacy] === undefined && process.env[branded] !== undefined) {
+      process.env[legacy] = process.env[branded];
+    }
+  }
+}
+
+applyClawkeeperCompatEnv();
 
 const EXPERIMENTAL = process.env.NEMOCLAW_EXPERIMENTAL === "1";
 const USE_COLOR = !process.env.NO_COLOR && !!process.stdout.isTTY;

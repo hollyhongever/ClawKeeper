@@ -30,7 +30,7 @@ describe("uninstall CLI flags", () => {
 
     expect(result.status).toBe(0);
     const output = `${result.stdout}${result.stderr}`;
-    expect(output).toMatch(/NemoClaw Uninstaller/);
+    expect(output).toMatch(/ClawKeeper Uninstaller/);
     expect(output).toMatch(/--yes/);
     expect(output).toMatch(/--keep-openshell/);
     expect(output).toMatch(/--delete-models/);
@@ -61,7 +61,7 @@ describe("uninstall CLI flags", () => {
 
       expect(result.status).toBe(0);
       const output = `${result.stdout}${result.stderr}`;
-      expect(output).toMatch(/NemoClaw/);
+      expect(output).toMatch(/ClawKeeper/);
       expect(output).toMatch(/Claws retracted/);
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });

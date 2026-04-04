@@ -103,7 +103,7 @@ process.exit(0);
     );
 
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /Recovered NemoClaw gateway runtime via (start|select)/);
+    assert.match(result.stdout, /Recovered ClawKeeper gateway runtime via (start|select)/);
     assert.match(result.stdout, /Phase: Ready/);
   });
 });

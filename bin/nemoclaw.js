@@ -47,6 +47,26 @@ const onboardSession = require("./lib/onboard-session");
 const { parseLiveSandboxNames } = require("./lib/runtime-recovery");
 const { NOTICE_ACCEPT_ENV, NOTICE_ACCEPT_FLAG } = require("./lib/usage-notice");
 
+const PRIMARY_CLI_NAME = "clawkeeper";
+const LEGACY_CLI_NAME = "nemoclaw";
+
+function detectInvokedCliName() {
+  const invoked = path.basename(process.argv[1] || "");
+  if (invoked === LEGACY_CLI_NAME || invoked === `${LEGACY_CLI_NAME}.js`) return LEGACY_CLI_NAME;
+  if (invoked === PRIMARY_CLI_NAME || invoked === `${PRIMARY_CLI_NAME}.js`) return PRIMARY_CLI_NAME;
+  return PRIMARY_CLI_NAME;
+}
+
+const INVOKED_CLI_NAME = detectInvokedCliName();
+
+function preferredCmd(args = "") {
+  return args ? `${PRIMARY_CLI_NAME} ${args}` : PRIMARY_CLI_NAME;
+}
+
+function invokedCmd(args = "") {
+  return args ? `${INVOKED_CLI_NAME} ${args}` : INVOKED_CLI_NAME;
+}
+
 // ── Global commands ──────────────────────────────────────────────
 
 const GLOBAL_COMMANDS = new Set([
@@ -68,7 +88,7 @@ const GLOBAL_COMMANDS = new Set([
 ]);
 
 const REMOTE_UNINSTALL_URL =
-  "https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh";
+  "https://raw.githubusercontent.com/hollyhongever/ClawKeeper/refs/heads/main/uninstall.sh";
 let OPENSHELL_BIN = null;
 const MIN_LOGS_OPENSHELL_VERSION = "0.0.7";
 const NEMOCLAW_GATEWAY_NAME = "nemoclaw";
@@ -569,7 +589,7 @@ function printGatewayLifecycleHint(output = "", sandboxName = "", writer = conso
   const cleanOutput = stripAnsi(output);
   if (/No gateway configured/i.test(cleanOutput)) {
     writer(
-      "  The selected NemoClaw gateway is no longer configured or its metadata/runtime has been lost.",
+      "  The selected ClawKeeper gateway is no longer configured or its metadata/runtime has been lost.",
     );
     writer(
       "  Start the gateway again with `openshell gateway start --name nemoclaw` before expecting existing sandboxes to reconnect.",
@@ -584,7 +604,7 @@ function printGatewayLifecycleHint(output = "", sandboxName = "", writer = conso
     /Gateway:\s+nemoclaw/i.test(cleanOutput)
   ) {
     writer(
-      "  The selected NemoClaw gateway exists in metadata, but its API is refusing connections after restart.",
+      "  The selected ClawKeeper gateway exists in metadata, but its API is refusing connections after restart.",
     );
     writer("  This usually means the gateway runtime did not come back cleanly after the restart.");
     writer(
@@ -598,7 +618,7 @@ function printGatewayLifecycleHint(output = "", sandboxName = "", writer = conso
       "  Existing sandboxes may still be recorded locally, but the current gateway no longer trusts their prior connection state.",
     );
     writer(
-      "  Try re-establishing the NemoClaw gateway/runtime first. If the sandbox is still unreachable, recreate just that sandbox with `nemoclaw onboard`.",
+      `  Try re-establishing the ClawKeeper gateway/runtime first. If the sandbox is still unreachable, recreate just that sandbox with \`${preferredCmd("onboard")}\`.`,
     );
     return;
   }
@@ -686,7 +706,7 @@ async function ensureLiveSandboxOrExit(sandboxName) {
     console.error(`  Sandbox '${sandboxName}' is not present in the live OpenShell gateway.`);
     console.error("  Removed stale local registry entry.");
     console.error(
-      "  Run `nemoclaw list` to confirm the remaining sandboxes, or `nemoclaw onboard` to create a new one.",
+      `  Run \`${preferredCmd("list")}\` to confirm the remaining sandboxes, or \`${preferredCmd("onboard")}\` to create a new one.`,
     );
     process.exit(1);
   }
@@ -701,13 +721,13 @@ async function ensureLiveSandboxOrExit(sandboxName) {
       "  Existing sandbox connections cannot be reattached safely after this gateway identity change.",
     );
     console.error(
-      "  Recreate this sandbox with `nemoclaw onboard` once the gateway runtime is stable.",
+      `  Recreate this sandbox with \`${preferredCmd("onboard")}\` once the gateway runtime is stable.`,
     );
     process.exit(1);
   }
   if (lookup.state === "gateway_unreachable_after_restart") {
     console.error(
-      `  Sandbox '${sandboxName}' may still exist, but the selected NemoClaw gateway is still refusing connections after restart.`,
+      `  Sandbox '${sandboxName}' may still exist, but the selected ClawKeeper gateway is still refusing connections after restart.`,
     );
     if (lookup.output) {
       console.error(lookup.output);
@@ -722,7 +742,7 @@ async function ensureLiveSandboxOrExit(sandboxName) {
   }
   if (lookup.state === "gateway_missing_after_restart") {
     console.error(
-      `  Sandbox '${sandboxName}' may still exist locally, but the NemoClaw gateway is no longer configured after restart/rebuild.`,
+      `  Sandbox '${sandboxName}' may still exist locally, but the ClawKeeper gateway is no longer configured after restart/rebuild.`,
     );
     if (lookup.output) {
       console.error(lookup.output);
@@ -747,11 +767,11 @@ async function ensureLiveSandboxOrExit(sandboxName) {
 function printOldLogsCompatibilityGuidance(installedVersion = null) {
   const versionText = installedVersion ? ` (${installedVersion})` : "";
   console.error(
-    `  Installed OpenShell${versionText} is too old or incompatible with \`nemoclaw logs\`.`,
+    `  Installed OpenShell${versionText} is too old or incompatible with \`${preferredCmd("logs")}\`.`,
   );
-  console.error(`  NemoClaw expects \`openshell logs <name>\` and live streaming via \`--tail\`.`);
+  console.error(`  ClawKeeper expects \`openshell logs <name>\` and live streaming via \`--tail\`.`);
   console.error(
-    "  Upgrade OpenShell by rerunning `nemoclaw onboard`, or reinstall the OpenShell CLI and try again.",
+    `  Upgrade OpenShell by rerunning \`${preferredCmd("onboard")}\`, or reinstall the OpenShell CLI and try again.`,
   );
 }
 
@@ -789,7 +809,7 @@ async function onboard(args) {
   if (unknownArgs.length > 0) {
     console.error(`  Unknown onboard option(s): ${unknownArgs.join(", ")}`);
     console.error(
-      `  Usage: nemoclaw onboard [--non-interactive] [--resume] [${NOTICE_ACCEPT_FLAG}]`,
+      `  Usage: ${invokedCmd(`onboard [--non-interactive] [--resume] [${NOTICE_ACCEPT_FLAG}]`)}`,
     );
     process.exit(1);
   }
@@ -802,7 +822,9 @@ async function onboard(args) {
 
 async function setup(args = []) {
   console.log("");
-  console.log("  ⚠  `nemoclaw setup` is deprecated. Use `nemoclaw onboard` instead.");
+  console.log(
+    `  ⚠  \`${invokedCmd("setup")}\` is deprecated. Use \`${preferredCmd("onboard")}\` instead.`,
+  );
   console.log("");
   await onboard(args);
 }
@@ -815,12 +837,12 @@ async function setupSpark() {
 // eslint-disable-next-line complexity
 async function deploy(instanceName) {
   if (!instanceName) {
-    console.error("  Usage: nemoclaw deploy <instance-name>");
+    console.error(`  Usage: ${invokedCmd("deploy <instance-name>")}`);
     console.error("");
     console.error("  Examples:");
-    console.error("    nemoclaw deploy my-gpu-box");
-    console.error("    nemoclaw deploy nemoclaw-prod");
-    console.error("    nemoclaw deploy nemoclaw-test");
+    console.error(`    ${preferredCmd("deploy my-gpu-box")}`);
+    console.error(`    ${preferredCmd("deploy clawkeeper-prod")}`);
+    console.error(`    ${preferredCmd("deploy clawkeeper-test")}`);
     process.exit(1);
   }
   await ensureApiKey();
@@ -833,7 +855,7 @@ async function deploy(instanceName) {
   const gpu = process.env.NEMOCLAW_GPU || "a2-highgpu-1g:nvidia-tesla-a100:1";
 
   console.log("");
-  console.log(`  Deploying NemoClaw to Brev instance: ${name}`);
+  console.log(`  Deploying ClawKeeper to Brev instance: ${name}`);
   console.log("");
 
   try {
@@ -882,7 +904,7 @@ async function deploy(instanceName) {
     }
   }
 
-  console.log("  Syncing NemoClaw to VM...");
+  console.log("  Syncing ClawKeeper to VM...");
   run(
     `ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${qname} 'mkdir -p /home/ubuntu/nemoclaw'`,
   );
@@ -965,8 +987,8 @@ function debug(args) {
     switch (args[i]) {
       case "--help":
       case "-h":
-        console.log("Collect NemoClaw diagnostic information\n");
-        console.log("Usage: nemoclaw debug [--quick] [--output FILE] [--sandbox NAME]\n");
+        console.log("Collect ClawKeeper diagnostic information\n");
+        console.log(`Usage: ${preferredCmd("debug [--quick] [--output FILE] [--sandbox NAME]")}\n`);
         console.log("Options:");
         console.log("  --quick, -q        Only collect minimal diagnostics");
         console.log("  --output, -o FILE  Write a tarball to FILE");
@@ -1078,10 +1100,10 @@ async function listSandboxes() {
         `  No sandboxes registered locally, but the last onboarded sandbox was '${session.sandboxName}'.`,
       );
       console.log(
-        "  Retry `nemoclaw <name> connect` or `nemoclaw <name> status` once the gateway/runtime is healthy.",
+        `  Retry \`${preferredCmd("<name> connect")}\` or \`${preferredCmd("<name> status")}\` once the gateway/runtime is healthy.`,
       );
     } else {
-      console.log("  No sandboxes registered. Run `nemoclaw onboard` to get started.");
+      console.log(`  No sandboxes registered. Run \`${preferredCmd("onboard")}\` to get started.`);
     }
     console.log("");
     return;
@@ -1151,7 +1173,7 @@ async function sandboxStatus(sandboxName) {
     console.log("");
     if (lookup.recoveredGateway) {
       console.log(
-        `  Recovered NemoClaw gateway runtime via ${lookup.recoveryVia || "gateway reattach"}.`,
+        `  Recovered ClawKeeper gateway runtime via ${lookup.recoveryVia || "gateway reattach"}.`,
       );
       console.log("");
     }
@@ -1173,12 +1195,12 @@ async function sandboxStatus(sandboxName) {
       "  Existing sandbox connections cannot be reattached safely after this gateway identity change.",
     );
     console.log(
-      "  Recreate this sandbox with `nemoclaw onboard` once the gateway runtime is stable.",
+      `  Recreate this sandbox with \`${preferredCmd("onboard")}\` once the gateway runtime is stable.`,
     );
   } else if (lookup.state === "gateway_unreachable_after_restart") {
     console.log("");
     console.log(
-      `  Sandbox '${sandboxName}' may still exist, but the selected NemoClaw gateway is still refusing connections after restart.`,
+      `  Sandbox '${sandboxName}' may still exist, but the selected ClawKeeper gateway is still refusing connections after restart.`,
     );
     if (lookup.output) {
       console.log(lookup.output);
@@ -1192,7 +1214,7 @@ async function sandboxStatus(sandboxName) {
   } else if (lookup.state === "gateway_missing_after_restart") {
     console.log("");
     console.log(
-      `  Sandbox '${sandboxName}' may still exist locally, but the NemoClaw gateway is no longer configured after restart/rebuild.`,
+      `  Sandbox '${sandboxName}' may still exist locally, but the ClawKeeper gateway is no longer configured after restart/rebuild.`,
     );
     if (lookup.output) {
       console.log(lookup.output);
@@ -1227,7 +1249,7 @@ async function sandboxStatus(sandboxName) {
         console.log("  This typically happens after a gateway restart (e.g., laptop close/open).");
         console.log("");
         console.log("  To recover, run:");
-        console.log(`    ${D}nemoclaw ${sandboxName} connect${R}  (auto-recovers on connect)`);
+        console.log(`    ${D}${preferredCmd(`${sandboxName} connect`)}${R}  (auto-recovers on connect)`);
         console.log("  Or manually inside the sandbox:");
         console.log(`    ${D}nohup openclaw gateway run > /tmp/gateway.log 2>&1 &${R}`);
       }
@@ -1368,48 +1390,49 @@ async function sandboxDestroy(sandboxName, args = []) {
 
 function help() {
   console.log(`
-  ${B}${G}NemoClaw${R}  ${D}v${getVersion()}${R}
+  ${B}${G}ClawKeeper${R}  ${D}v${getVersion()}${R}
   ${D}Deploy more secure, always-on AI assistants with a single command.${R}
+  ${D}Primary command: ${PRIMARY_CLI_NAME} · Legacy alias: ${LEGACY_CLI_NAME}${R}
 
   ${G}Getting Started:${R}
-    ${B}nemoclaw onboard${R}                 Configure inference endpoint and credentials
-                                    ${D}(non-interactive: ${NOTICE_ACCEPT_FLAG} or ${NOTICE_ACCEPT_ENV}=1)${R}
-    nemoclaw setup-spark             Set up on DGX Spark ${D}(fixes cgroup v2 + Docker)${R}
+    ${B}${preferredCmd("onboard")}${R}                 Configure inference endpoint and credentials
+                                    ${D}(non-interactive: ${NOTICE_ACCEPT_FLAG}, CLAWKEEPER_ACCEPT_THIRD_PARTY_SOFTWARE=1, or ${NOTICE_ACCEPT_ENV}=1)${R}
+    ${preferredCmd("setup-spark")}             Set up on DGX Spark ${D}(fixes cgroup v2 + Docker)${R}
 
   ${G}Sandbox Management:${R}
-    ${B}nemoclaw list${R}                    List all sandboxes
-    nemoclaw <name> connect          Shell into a running sandbox
-    nemoclaw <name> status           Sandbox health + NIM status
-    nemoclaw <name> logs ${D}[--follow]${R}  Stream sandbox logs
-    nemoclaw <name> destroy          Stop NIM + delete sandbox ${D}(--yes to skip prompt)${R}
+    ${B}${preferredCmd("list")}${R}                    List all sandboxes
+    ${preferredCmd("<name> connect")}          Shell into a running sandbox
+    ${preferredCmd("<name> status")}           Sandbox health + NIM status
+    ${preferredCmd("<name> logs")} ${D}[--follow]${R}  Stream sandbox logs
+    ${preferredCmd("<name> destroy")}          Stop NIM + delete sandbox ${D}(--yes to skip prompt)${R}
 
   ${G}Policy Presets:${R}
-    nemoclaw <name> policy-add       Add a network or filesystem policy preset
-    nemoclaw <name> policy-list      List presets ${D}(● = applied)${R}
+    ${preferredCmd("<name> policy-add")}       Add a network or filesystem policy preset
+    ${preferredCmd("<name> policy-list")}      List presets ${D}(● = applied)${R}
 
   ${G}Deploy:${R}
-    nemoclaw deploy <instance>       Deploy to a Brev VM and start services
+    ${preferredCmd("deploy <instance>")}       Deploy to a Brev VM and start services
 
   ${G}Services:${R}
-    nemoclaw start                   Start auxiliary services ${D}(Telegram, tunnel)${R}
-    nemoclaw stop                    Stop all services
-    nemoclaw status                  Show sandbox list and service status
+    ${preferredCmd("start")}                   Start auxiliary services ${D}(Telegram, tunnel)${R}
+    ${preferredCmd("stop")}                    Stop all services
+    ${preferredCmd("status")}                  Show sandbox list and service status
 
   Troubleshooting:
-    nemoclaw debug [--quick]         Collect diagnostics for bug reports
-    nemoclaw debug --output FILE     Save diagnostics tarball for GitHub issues
+    ${preferredCmd("debug [--quick]")}         Collect diagnostics for bug reports
+    ${preferredCmd("debug --output FILE")}     Save diagnostics tarball for GitHub issues
 
   Cleanup:
-    nemoclaw uninstall [flags]       Run uninstall.sh (local first, curl fallback)
+    ${preferredCmd("uninstall [flags]")}       Run uninstall.sh (local first, curl fallback)
 
   ${G}Uninstall flags:${R}
     --yes                            Skip the confirmation prompt
     --keep-openshell                 Leave the openshell binary installed
-    --delete-models                  Remove NemoClaw-pulled Ollama models
+    --delete-models                  Remove ClawKeeper-pulled Ollama models
 
   ${D}Powered by NVIDIA OpenShell · Nemotron · Agent Toolkit
   Credentials saved in ~/.nemoclaw/credentials.json (mode 600)${R}
-  ${D}https://www.nvidia.com/nemoclaw${R}
+  ${D}https://github.com/hollyhongever/ClawKeeper${R}
 `);
 }
 
@@ -1460,7 +1483,7 @@ const [cmd, ...args] = process.argv.slice(2);
         break;
       case "--version":
       case "-v": {
-        console.log(`nemoclaw v${getVersion()}`);
+        console.log(`${INVOKED_CLI_NAME} v${getVersion()}`);
         break;
       }
       default:
@@ -1470,7 +1493,7 @@ const [cmd, ...args] = process.argv.slice(2);
     return;
   }
 
-  // Sandbox-scoped commands: nemoclaw <name> <action>
+  // Sandbox-scoped commands: <cli> <name> <action>
   const sandbox = registry.getSandbox(cmd);
   if (sandbox) {
     validateName(cmd, "sandbox name");
@@ -1521,10 +1544,10 @@ const [cmd, ...args] = process.argv.slice(2);
   const allNames = registry.listSandboxes().sandboxes.map((s) => s.name);
   if (allNames.length > 0) {
     console.error(`  Registered sandboxes: ${allNames.join(", ")}`);
-    console.error(`  Try: nemoclaw <sandbox-name> connect`);
+    console.error(`  Try: ${preferredCmd("<sandbox-name> connect")}`);
     console.error("");
   }
 
-  console.error(`  Run 'nemoclaw help' for usage.`);
+  console.error(`  Run '${preferredCmd("help")}' for usage.`);
   process.exit(1);
 })();

@@ -4,9 +4,47 @@
 #
 # NEMOCLAW_VERSIONED_INSTALLER_PAYLOAD=1
 #
-# NemoClaw installer — installs Node.js, Ollama (if GPU present), and NemoClaw.
+# ClawKeeper installer — installs Node.js, Ollama (if GPU present), and ClawKeeper.
 
 set -euo pipefail
+
+PREFERRED_CLI_CMD="clawkeeper"
+LEGACY_CLI_CMD="nemoclaw"
+
+compat_env_export() {
+  local legacy="$1" branded="$2"
+  if [[ -z "${!legacy+x}" && -n "${!branded+x}" ]]; then
+    export "$legacy=${!branded}"
+  fi
+}
+
+# Brand-compat environment bridge: legacy NEMOCLAW_* keeps precedence.
+compat_env_export "NEMOCLAW_INSTALL_TAG" "CLAWKEEPER_INSTALL_TAG"
+compat_env_export "NEMOCLAW_INSTALL_REF" "CLAWKEEPER_INSTALL_REF"
+compat_env_export "NEMOCLAW_NON_INTERACTIVE" "CLAWKEEPER_NON_INTERACTIVE"
+compat_env_export \
+  "NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE" \
+  "CLAWKEEPER_ACCEPT_THIRD_PARTY_SOFTWARE"
+compat_env_export "NEMOCLAW_SANDBOX_NAME" "CLAWKEEPER_SANDBOX_NAME"
+compat_env_export "NEMOCLAW_RECREATE_SANDBOX" "CLAWKEEPER_RECREATE_SANDBOX"
+compat_env_export "NEMOCLAW_PROVIDER" "CLAWKEEPER_PROVIDER"
+compat_env_export "NEMOCLAW_MODEL" "CLAWKEEPER_MODEL"
+compat_env_export "NEMOCLAW_POLICY_MODE" "CLAWKEEPER_POLICY_MODE"
+compat_env_export "NEMOCLAW_POLICY_PRESETS" "CLAWKEEPER_POLICY_PRESETS"
+compat_env_export "NEMOCLAW_EXPERIMENTAL" "CLAWKEEPER_EXPERIMENTAL"
+compat_env_export "NEMOCLAW_REPO_ROOT" "CLAWKEEPER_REPO_ROOT"
+
+choose_cli_command() {
+  if command -v "$PREFERRED_CLI_CMD" >/dev/null 2>&1; then
+    printf "%s" "$PREFERRED_CLI_CMD"
+    return
+  fi
+  if command -v "$LEGACY_CLI_CMD" >/dev/null 2>&1; then
+    printf "%s" "$LEGACY_CLI_CMD"
+    return
+  fi
+  printf "%s" "$PREFERRED_CLI_CMD"
+}
 
 # Global cleanup state — ensures background processes are killed and temp files
 # are removed on any exit path (set -e, unhandled signal, unexpected error).
@@ -206,7 +244,7 @@ print_done() {
 
   info "=== Installation complete ==="
   printf "\n"
-  printf "  ${C_GREEN}${C_BOLD}NemoClaw${C_RESET}  ${C_DIM}(%ss)${C_RESET}\n" "$elapsed"
+  printf "  ${C_GREEN}${C_BOLD}ClawKeeper${C_RESET}  ${C_DIM}(%ss)${C_RESET}\n" "$elapsed"
   printf "\n"
   if [[ "$ONBOARD_RAN" == true ]]; then
     local sandbox_name
@@ -218,20 +256,20 @@ print_done() {
     if [[ "$_needs_reload" == true ]]; then
       printf "  %s$%s source %s\n" "$C_GREEN" "$C_RESET" "$(detect_shell_profile)"
     fi
-    printf "  %s$%s nemoclaw %s connect\n" "$C_GREEN" "$C_RESET" "$sandbox_name"
+    printf "  %s$%s %s %s connect\n" "$C_GREEN" "$C_RESET" "$PREFERRED_CLI_CMD" "$sandbox_name"
     printf "  %ssandbox@%s$%s openclaw tui\n" "$C_GREEN" "$sandbox_name" "$C_RESET"
   elif [[ "$NEMOCLAW_READY_NOW" == true ]]; then
-    printf "  ${C_GREEN}NemoClaw CLI is installed.${C_RESET}\n"
+    printf "  ${C_GREEN}ClawKeeper CLI is installed.${C_RESET}\n"
     printf "  ${C_DIM}Onboarding has not run yet.${C_RESET}\n"
     printf "\n"
     printf "  ${C_GREEN}Next:${C_RESET}\n"
     if [[ "$_needs_reload" == true ]]; then
       printf "  %s$%s source %s\n" "$C_GREEN" "$C_RESET" "$(detect_shell_profile)"
     fi
-    printf "  %s$%s nemoclaw onboard\n" "$C_GREEN" "$C_RESET"
+    printf "  %s$%s %s onboard\n" "$C_GREEN" "$C_RESET" "$PREFERRED_CLI_CMD"
   else
-    printf "  ${C_GREEN}NemoClaw CLI is installed.${C_RESET}\n"
-    printf "  ${C_DIM}Onboarding did not run because this shell cannot resolve 'nemoclaw' yet.${C_RESET}\n"
+    printf "  ${C_GREEN}ClawKeeper CLI is installed.${C_RESET}\n"
+    printf "  ${C_DIM}Onboarding did not run because this shell cannot resolve '%s' yet.${C_RESET}\n" "$PREFERRED_CLI_CMD"
     printf "\n"
     printf "  ${C_GREEN}Next:${C_RESET}\n"
     if [[ -n "$NEMOCLAW_RECOVERY_EXPORT_DIR" ]]; then
@@ -240,11 +278,11 @@ print_done() {
     if [[ -n "$NEMOCLAW_RECOVERY_PROFILE" ]]; then
       printf "  %s$%s source %s\n" "$C_GREEN" "$C_RESET" "$NEMOCLAW_RECOVERY_PROFILE"
     fi
-    printf "  %s$%s nemoclaw onboard\n" "$C_GREEN" "$C_RESET"
+    printf "  %s$%s %s onboard\n" "$C_GREEN" "$C_RESET" "$PREFERRED_CLI_CMD"
   fi
   printf "\n"
-  printf "  ${C_BOLD}GitHub${C_RESET}  ${C_DIM}https://github.com/nvidia/nemoclaw${C_RESET}\n"
-  printf "  ${C_BOLD}Docs${C_RESET}    ${C_DIM}https://docs.nvidia.com/nemoclaw/latest/${C_RESET}\n"
+  printf "  ${C_BOLD}GitHub${C_RESET}  ${C_DIM}https://github.com/hollyhongever/ClawKeeper${C_RESET}\n"
+  printf "  ${C_BOLD}Docs${C_RESET}    ${C_DIM}https://docs.openclaw.ai/gateway/sandboxing${C_RESET}\n"
   printf "\n"
 }
 
@@ -252,10 +290,10 @@ usage() {
   local version_suffix
   version_suffix="$(installer_version_for_display)"
   printf "\n"
-  printf "  ${C_BOLD}NemoClaw Installer${C_RESET}${C_DIM}%s${C_RESET}\n\n" "$version_suffix"
+  printf "  ${C_BOLD}ClawKeeper Installer${C_RESET}${C_DIM}%s${C_RESET}\n\n" "$version_suffix"
   printf "  ${C_DIM}Usage:${C_RESET}\n"
-  printf "    curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash\n"
-  printf "    curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash -s -- [options]\n\n"
+  printf "    curl -fsSL https://raw.githubusercontent.com/hollyhongever/ClawKeeper/main/install.sh | bash\n"
+  printf "    curl -fsSL https://raw.githubusercontent.com/hollyhongever/ClawKeeper/main/install.sh | bash -s -- [options]\n\n"
   printf "  ${C_DIM}Options:${C_RESET}\n"
   printf "    --non-interactive    Skip prompts (uses env vars / defaults)\n"
   printf "    --yes-i-accept-third-party-software Accept the third-party software notice in non-interactive mode\n"
@@ -263,17 +301,18 @@ usage() {
   printf "    --help, -h           Show this help message and exit\n\n"
   printf "  ${C_DIM}Environment:${C_RESET}\n"
   printf "    NVIDIA_API_KEY                API key (skips credential prompt)\n"
-  printf "    NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 Same as --yes-i-accept-third-party-software\n"
-  printf "    NEMOCLAW_NON_INTERACTIVE=1    Same as --non-interactive\n"
-  printf "    NEMOCLAW_SANDBOX_NAME         Sandbox name to create/use\n"
-  printf "    NEMOCLAW_RECREATE_SANDBOX=1   Recreate an existing sandbox\n"
-  printf "    NEMOCLAW_INSTALL_TAG         Git ref to install (default: latest release)\n"
-  printf "    NEMOCLAW_PROVIDER             cloud | ollama | nim | vllm\n"
-  printf "    NEMOCLAW_MODEL                Inference model to configure\n"
-  printf "    NEMOCLAW_POLICY_MODE          suggested | custom | skip\n"
-  printf "    NEMOCLAW_POLICY_PRESETS       Comma-separated policy presets\n"
+  printf "    CLAWKEEPER_ACCEPT_THIRD_PARTY_SOFTWARE=1 Same as --yes-i-accept-third-party-software\n"
+  printf "    CLAWKEEPER_NON_INTERACTIVE=1  Same as --non-interactive\n"
+  printf "    CLAWKEEPER_SANDBOX_NAME       Sandbox name to create/use\n"
+  printf "    CLAWKEEPER_RECREATE_SANDBOX=1 Recreate an existing sandbox\n"
+  printf "    CLAWKEEPER_INSTALL_TAG        Git ref to install (default: latest release)\n"
+  printf "    CLAWKEEPER_PROVIDER           cloud | ollama | nim | vllm\n"
+  printf "    CLAWKEEPER_MODEL              Inference model to configure\n"
+  printf "    CLAWKEEPER_POLICY_MODE        suggested | custom | skip\n"
+  printf "    CLAWKEEPER_POLICY_PRESETS     Comma-separated policy presets\n"
   printf "    BRAVE_API_KEY                 Enable Brave Search with this API key (stored in sandbox OpenClaw config)\n"
-  printf "    NEMOCLAW_EXPERIMENTAL=1       Show experimental/local options\n"
+  printf "    CLAWKEEPER_EXPERIMENTAL=1     Show experimental/local options\n"
+  printf "    (legacy NEMOCLAW_* variables are still supported)\n"
   printf "    CHAT_UI_URL                   Chat UI URL to open after setup\n"
   printf "    DISCORD_BOT_TOKEN             Auto-enable Discord policy support\n"
   printf "    SLACK_BOT_TOKEN               Auto-enable Slack policy support\n"
@@ -305,7 +344,7 @@ show_usage_notice() {
     exec 3<&-
     return "$status"
   else
-    error "Interactive third-party software acceptance requires a TTY. Re-run in a terminal or set NEMOCLAW_NON_INTERACTIVE=1 with --yes-i-accept-third-party-software."
+    error "Interactive third-party software acceptance requires a TTY. Re-run in a terminal or set CLAWKEEPER_NON_INTERACTIVE=1 (or NEMOCLAW_NON_INTERACTIVE=1) with --yes-i-accept-third-party-software."
   fi
 }
 
@@ -371,7 +410,7 @@ command_exists() { command -v "$1" &>/dev/null; }
 
 MIN_NODE_VERSION="22.16.0"
 MIN_NPM_MAJOR=10
-RUNTIME_REQUIREMENT_MSG="NemoClaw requires Node.js >=${MIN_NODE_VERSION} and npm >=${MIN_NPM_MAJOR}."
+RUNTIME_REQUIREMENT_MSG="ClawKeeper requires Node.js >=${MIN_NODE_VERSION} and npm >=${MIN_NPM_MAJOR}."
 NEMOCLAW_SHIM_DIR="${HOME}/.local/bin"
 NEMOCLAW_READY_NOW=false
 NEMOCLAW_RECOVERY_PROFILE=""
@@ -591,7 +630,7 @@ install_nodejs() {
       info "Node.js found: ${current_version}"
       return
     fi
-    warn "Node.js ${current_version}, npm major ${current_npm_major:-unknown} found but NemoClaw requires Node.js >=${MIN_NODE_VERSION} and npm >=${MIN_NPM_MAJOR} — upgrading via nvm…"
+    warn "Node.js ${current_version}, npm major ${current_npm_major:-unknown} found but ClawKeeper requires Node.js >=${MIN_NODE_VERSION} and npm >=${MIN_NPM_MAJOR} — upgrading via nvm…"
   else
     info "Node.js not found — installing via nvm…"
   fi
@@ -850,19 +889,19 @@ install_nemoclaw() {
   repo_root="$(resolve_repo_root)"
   package_json="${repo_root}/package.json"
   if is_source_checkout "$repo_root"; then
-    info "NemoClaw package.json found in the selected source checkout — installing from source…"
+    info "ClawKeeper package.json found in the selected source checkout — installing from source…"
     NEMOCLAW_SOURCE_ROOT="$repo_root"
     spin "Preparing OpenClaw package" bash -c "$(declare -f info warn resolve_openclaw_version pre_extract_openclaw); pre_extract_openclaw \"\$1\"" _ "$NEMOCLAW_SOURCE_ROOT" \
       || warn "Pre-extraction failed — npm install may fail if openclaw tarball is broken"
-    spin "Installing NemoClaw dependencies" bash -c "cd \"$NEMOCLAW_SOURCE_ROOT\" && npm install --ignore-scripts"
-    spin "Building NemoClaw CLI modules" bash -c "cd \"$NEMOCLAW_SOURCE_ROOT\" && npm run --if-present build:cli"
-    spin "Building NemoClaw plugin" bash -c "cd \"$NEMOCLAW_SOURCE_ROOT\"/nemoclaw && npm install --ignore-scripts && npm run build"
-    spin "Linking NemoClaw CLI" bash -c "cd \"$NEMOCLAW_SOURCE_ROOT\" && npm link"
+    spin "Installing ClawKeeper dependencies" bash -c "cd \"$NEMOCLAW_SOURCE_ROOT\" && npm install --ignore-scripts"
+    spin "Building ClawKeeper CLI modules" bash -c "cd \"$NEMOCLAW_SOURCE_ROOT\" && npm run --if-present build:cli"
+    spin "Building ClawKeeper plugin" bash -c "cd \"$NEMOCLAW_SOURCE_ROOT\"/nemoclaw && npm install --ignore-scripts && npm run build"
+    spin "Linking ClawKeeper CLI" bash -c "cd \"$NEMOCLAW_SOURCE_ROOT\" && npm link"
   else
     if [[ -f "$package_json" ]]; then
       info "Installer payload is not a persistent source checkout — installing from GitHub…"
     fi
-    info "Installing NemoClaw from GitHub…"
+    info "Installing ClawKeeper from GitHub…"
     # Resolve the latest release tag so we never install raw main.
     local release_ref
     release_ref="$(resolve_release_tag)"
@@ -874,7 +913,7 @@ install_nemoclaw() {
     rm -rf "$nemoclaw_src"
     mkdir -p "$(dirname "$nemoclaw_src")"
     NEMOCLAW_SOURCE_ROOT="$nemoclaw_src"
-    spin "Cloning NemoClaw source" git clone --depth 1 --branch "$release_ref" https://github.com/NVIDIA/NemoClaw.git "$nemoclaw_src"
+    spin "Cloning ClawKeeper source" git clone --depth 1 --branch "$release_ref" https://github.com/hollyhongever/ClawKeeper.git "$nemoclaw_src"
     # Fetch version tags into the shallow clone so `git describe --tags
     # --match "v*"` works at runtime (the shallow clone only has the
     # single ref we asked for).
@@ -885,10 +924,10 @@ install_nemoclaw() {
       | sed 's/^v//' >"$nemoclaw_src/.version" || true
     spin "Preparing OpenClaw package" bash -c "$(declare -f info warn resolve_openclaw_version pre_extract_openclaw); pre_extract_openclaw \"\$1\"" _ "$nemoclaw_src" \
       || warn "Pre-extraction failed — npm install may fail if openclaw tarball is broken"
-    spin "Installing NemoClaw dependencies" bash -c "cd \"$nemoclaw_src\" && npm install --ignore-scripts"
-    spin "Building NemoClaw CLI modules" bash -c "cd \"$nemoclaw_src\" && npm run --if-present build:cli"
-    spin "Building NemoClaw plugin" bash -c "cd \"$nemoclaw_src\"/nemoclaw && npm install --ignore-scripts && npm run build"
-    spin "Linking NemoClaw CLI" bash -c "cd \"$nemoclaw_src\" && npm link"
+    spin "Installing ClawKeeper dependencies" bash -c "cd \"$nemoclaw_src\" && npm install --ignore-scripts"
+    spin "Building ClawKeeper CLI modules" bash -c "cd \"$nemoclaw_src\" && npm run --if-present build:cli"
+    spin "Building ClawKeeper plugin" bash -c "cd \"$nemoclaw_src\"/nemoclaw && npm install --ignore-scripts && npm run build"
+    spin "Linking ClawKeeper CLI" bash -c "cd \"$nemoclaw_src\" && npm link"
   fi
 
   refresh_path
@@ -899,10 +938,13 @@ install_nemoclaw() {
 # 4. Verify
 # ---------------------------------------------------------------------------
 verify_nemoclaw() {
-  if command_exists nemoclaw; then
+  local cli_cmd
+  cli_cmd="$(choose_cli_command)"
+
+  if command_exists "$cli_cmd"; then
     NEMOCLAW_READY_NOW=true
     ensure_nemoclaw_shim || true
-    info "Verified: nemoclaw is available at $(command -v nemoclaw)"
+    info "Verified: ${cli_cmd} is available at $(command -v "$cli_cmd")"
     return 0
   fi
 
@@ -911,9 +953,10 @@ verify_nemoclaw() {
 
   if [[ -n "$npm_bin" && -x "$npm_bin/nemoclaw" ]]; then
     ensure_nemoclaw_shim || true
-    if command_exists nemoclaw; then
+    cli_cmd="$(choose_cli_command)"
+    if command_exists "$cli_cmd"; then
       NEMOCLAW_READY_NOW=true
-      info "Verified: nemoclaw is available at $(command -v nemoclaw)"
+      info "Verified: ${cli_cmd} is available at $(command -v "$cli_cmd")"
       return 0
     fi
 
@@ -923,15 +966,15 @@ verify_nemoclaw() {
     else
       NEMOCLAW_RECOVERY_EXPORT_DIR="$npm_bin"
     fi
-    warn "Found nemoclaw at $npm_bin/nemoclaw but this shell still cannot resolve it."
+    warn "Found the CLI at $npm_bin/nemoclaw but this shell still cannot resolve '$PREFERRED_CLI_CMD' yet."
     warn "Onboarding will be skipped until PATH is updated."
     return 0
   else
-    warn "Could not locate the nemoclaw executable."
-    warn "Try running:  npm install -g git+https://github.com/NVIDIA/NemoClaw.git"
+    warn "Could not locate the ClawKeeper executable."
+    warn "Try running:  npm install -g git+https://github.com/hollyhongever/ClawKeeper.git"
   fi
 
-  error "Installation failed: nemoclaw binary not found."
+  error "Installation failed: ClawKeeper binary not found."
 }
 
 # ---------------------------------------------------------------------------
@@ -939,7 +982,9 @@ verify_nemoclaw() {
 # ---------------------------------------------------------------------------
 run_onboard() {
   show_usage_notice
-  info "Running nemoclaw onboard…"
+  local cli_cmd
+  cli_cmd="$(choose_cli_command)"
+  info "Running ${cli_cmd} onboard…"
   local -a onboard_cmd=(onboard)
   if command_exists node && [[ -f "${HOME}/.nemoclaw/onboard-session.json" ]]; then
     if node -e '
@@ -963,17 +1008,17 @@ run_onboard() {
     if [ "${ACCEPT_THIRD_PARTY_SOFTWARE:-}" = "1" ]; then
       onboard_cmd+=(--yes-i-accept-third-party-software)
     fi
-    nemoclaw "${onboard_cmd[@]}"
+    "$cli_cmd" "${onboard_cmd[@]}"
   elif [ -t 0 ]; then
-    nemoclaw "${onboard_cmd[@]}"
+    "$cli_cmd" "${onboard_cmd[@]}"
   elif exec 3</dev/tty; then
     info "Installer stdin is piped; attaching onboarding to /dev/tty…"
     local status=0
-    nemoclaw "${onboard_cmd[@]}" <&3 || status=$?
+    "$cli_cmd" "${onboard_cmd[@]}" <&3 || status=$?
     exec 3<&-
     return "$status"
   else
-    error "Interactive onboarding requires a TTY. Re-run in a terminal or set NEMOCLAW_NON_INTERACTIVE=1 with --yes-i-accept-third-party-software."
+    error "Interactive onboarding requires a TTY. Re-run in a terminal or set CLAWKEEPER_NON_INTERACTIVE=1 (or NEMOCLAW_NON_INTERACTIVE=1) with --yes-i-accept-third-party-software."
   fi
 }
 
@@ -994,16 +1039,16 @@ post_install_message() {
 
   echo ""
   echo "  ──────────────────────────────────────────────────"
-  warn "Your current shell cannot resolve 'nemoclaw' yet."
+  warn "Your current shell cannot resolve '$PREFERRED_CLI_CMD' yet."
   echo ""
-  echo "  To use nemoclaw now, run:"
+  echo "  To use $PREFERRED_CLI_CMD now, run:"
   echo ""
   echo "    export PATH=\"${NEMOCLAW_RECOVERY_EXPORT_DIR}:\$PATH\""
   echo "    source ${NEMOCLAW_RECOVERY_PROFILE}"
   echo ""
   echo "  Then run:"
   echo ""
-  echo "    nemoclaw onboard"
+  echo "    $PREFERRED_CLI_CMD onboard"
   echo ""
   echo "  Or open a new terminal window after updating your shell profile."
   echo "  ──────────────────────────────────────────────────"
@@ -1024,7 +1069,7 @@ main() {
       --version | -v)
         local version_suffix
         version_suffix="$(installer_version_for_display)"
-        printf "nemoclaw-installer%s\n" "${version_suffix# }"
+        printf "clawkeeper-installer%s\n" "${version_suffix# }"
         exit 0
         ;;
       --help | -h)
@@ -1038,8 +1083,8 @@ main() {
     esac
   done
   # Also honor env var
-  NON_INTERACTIVE="${NON_INTERACTIVE:-${NEMOCLAW_NON_INTERACTIVE:-}}"
-  ACCEPT_THIRD_PARTY_SOFTWARE="${ACCEPT_THIRD_PARTY_SOFTWARE:-${NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE:-}}"
+  NON_INTERACTIVE="${NON_INTERACTIVE:-${NEMOCLAW_NON_INTERACTIVE:-${CLAWKEEPER_NON_INTERACTIVE:-}}}"
+  ACCEPT_THIRD_PARTY_SOFTWARE="${ACCEPT_THIRD_PARTY_SOFTWARE:-${NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE:-${CLAWKEEPER_ACCEPT_THIRD_PARTY_SOFTWARE:-}}}"
   export NEMOCLAW_NON_INTERACTIVE="${NON_INTERACTIVE}"
   export NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE="${ACCEPT_THIRD_PARTY_SOFTWARE}"
 
@@ -1050,18 +1095,20 @@ main() {
   install_nodejs
   ensure_supported_runtime
 
-  step 2 "NemoClaw CLI"
+  step 2 "ClawKeeper CLI"
   # install_or_upgrade_ollama
   fix_npm_permissions
   install_nemoclaw
   verify_nemoclaw
 
   step 3 "Onboarding"
-  if command_exists nemoclaw; then
+  local cli_cmd
+  cli_cmd="$(choose_cli_command)"
+  if command_exists "$cli_cmd"; then
     run_onboard
     ONBOARD_RAN=true
   else
-    warn "Skipping onboarding — this shell still cannot resolve 'nemoclaw'."
+    warn "Skipping onboarding — this shell still cannot resolve '$PREFERRED_CLI_CMD'."
   fi
 
   print_done

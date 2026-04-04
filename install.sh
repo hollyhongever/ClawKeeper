@@ -2,12 +2,32 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Thin bootstrap for the NemoClaw installer.
+# Thin bootstrap for the ClawKeeper installer.
 # Public curl|bash installs should select a ref once, clone that ref, then
 # execute installer logic from that same clone. Historical tags that predate
 # the extracted payload fall back to their own root install.sh.
 
 set -euo pipefail
+
+apply_brand_compat_env() {
+  local legacy="$1" branded="$2"
+  if [[ -z "${!legacy+x}" && -n "${!branded+x}" ]]; then
+    export "$legacy=${!branded}"
+  fi
+}
+
+apply_brand_compat_env "NEMOCLAW_INSTALL_TAG" "CLAWKEEPER_INSTALL_TAG"
+apply_brand_compat_env "NEMOCLAW_INSTALL_REF" "CLAWKEEPER_INSTALL_REF"
+apply_brand_compat_env "NEMOCLAW_NON_INTERACTIVE" "CLAWKEEPER_NON_INTERACTIVE"
+apply_brand_compat_env \
+  "NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE" \
+  "CLAWKEEPER_ACCEPT_THIRD_PARTY_SOFTWARE"
+apply_brand_compat_env "NEMOCLAW_SANDBOX_NAME" "CLAWKEEPER_SANDBOX_NAME"
+apply_brand_compat_env "NEMOCLAW_PROVIDER" "CLAWKEEPER_PROVIDER"
+apply_brand_compat_env "NEMOCLAW_MODEL" "CLAWKEEPER_MODEL"
+apply_brand_compat_env "NEMOCLAW_RECREATE_SANDBOX" "CLAWKEEPER_RECREATE_SANDBOX"
+apply_brand_compat_env "NEMOCLAW_POLICY_MODE" "CLAWKEEPER_POLICY_MODE"
+apply_brand_compat_env "NEMOCLAW_POLICY_PRESETS" "CLAWKEEPER_POLICY_PRESETS"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 LOCAL_PAYLOAD="${SCRIPT_DIR}/scripts/install.sh"
@@ -46,7 +66,7 @@ exec_installer_from_ref() {
   source_root="${tmpdir}/source"
 
   git -c advice.detachedHead=false clone --quiet --depth 1 --branch "$ref" \
-    https://github.com/NVIDIA/NemoClaw.git "$source_root"
+    https://github.com/hollyhongever/ClawKeeper.git "$source_root"
 
   payload_script="${source_root}/scripts/install.sh"
   legacy_script="${source_root}/install.sh"
@@ -63,27 +83,31 @@ exec_installer_from_ref() {
 }
 
 bootstrap_version() {
-  printf "nemoclaw-installer\n"
+  printf "clawkeeper-installer\n"
 }
 
 bootstrap_usage() {
   printf "\n"
-  printf "  NemoClaw Installer\n\n"
+  printf "  ClawKeeper Installer\n\n"
   printf "  Usage:\n"
-  printf "    curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash\n"
-  printf "    curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash -s -- [options]\n\n"
+  printf "    curl -fsSL https://raw.githubusercontent.com/hollyhongever/ClawKeeper/main/install.sh | bash\n"
+  printf "    curl -fsSL https://raw.githubusercontent.com/hollyhongever/ClawKeeper/main/install.sh | bash -s -- [options]\n\n"
   printf "  Options:\n"
   printf "    --non-interactive    Skip prompts (uses env vars / defaults)\n"
   printf "    --yes-i-accept-third-party-software Accept the third-party software notice in non-interactive mode\n"
   printf "    --version, -v        Print installer version and exit\n"
   printf "    --help, -h           Show this help message and exit\n\n"
   printf "  Environment:\n"
-  printf "    NEMOCLAW_INSTALL_TAG         Git ref to install (default: latest release)\n"
-  printf "    NEMOCLAW_NON_INTERACTIVE=1   Same as --non-interactive\n"
-  printf "    NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 Same as --yes-i-accept-third-party-software\n"
-  printf "    NEMOCLAW_SANDBOX_NAME        Sandbox name to create/use\n"
-  printf "    NEMOCLAW_PROVIDER            cloud | ollama | nim | vllm\n"
-  printf "    NEMOCLAW_POLICY_MODE         suggested | custom | skip\n"
+  printf "    CLAWKEEPER_INSTALL_TAG       Git ref to install (fallback: NEMOCLAW_INSTALL_TAG)\n"
+  printf "    CLAWKEEPER_NON_INTERACTIVE=1 Same as --non-interactive\n"
+  printf "    CLAWKEEPER_ACCEPT_THIRD_PARTY_SOFTWARE=1 Same as --yes-i-accept-third-party-software\n"
+  printf "    CLAWKEEPER_SANDBOX_NAME      Sandbox name to create/use\n"
+  printf "    CLAWKEEPER_PROVIDER          cloud | ollama | nim | vllm\n"
+  printf "    CLAWKEEPER_MODEL             Inference model to configure\n"
+  printf "    CLAWKEEPER_RECREATE_SANDBOX=1 Recreate an existing sandbox\n"
+  printf "    CLAWKEEPER_POLICY_MODE       suggested | custom | skip\n"
+  printf "    CLAWKEEPER_POLICY_PRESETS    Comma-separated policy presets\n"
+  printf "    (legacy NEMOCLAW_* variables are still supported)\n"
   printf "\n"
 }
 

@@ -18,7 +18,7 @@ const mockedLoadOnboardConfig = vi.mocked(loadOnboardConfig);
 function createMockApi(): OpenClawPluginApi {
   return {
     id: "nemoclaw",
-    name: "NemoClaw",
+    name: "ClawKeeper",
     version: "0.1.0",
     config: {},
     pluginConfig: {},
@@ -42,10 +42,12 @@ describe("plugin registration", () => {
     mockedLoadOnboardConfig.mockReturnValue(null);
   });
 
-  it("registers a slash command", () => {
+  it("registers slash commands with a legacy alias", () => {
     const api = createMockApi();
     register(api);
-    expect(api.registerCommand).toHaveBeenCalledWith(expect.objectContaining({ name: "nemoclaw" }));
+    const registered = vi.mocked(api.registerCommand).mock.calls.map((call) => call[0]?.name);
+    expect(registered).toContain("clawkeeper");
+    expect(registered).toContain("nemoclaw");
   });
 
   it("registers an inference provider", () => {

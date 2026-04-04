@@ -10,7 +10,7 @@ import { spawnSync } from "node:child_process";
 const INSTALLER = path.join(import.meta.dirname, "..", "install.sh");
 const CURL_PIPE_INSTALLER = path.join(import.meta.dirname, "..", "install.sh");
 const INSTALLER_PAYLOAD = path.join(import.meta.dirname, "..", "scripts", "install.sh");
-const GITHUB_INSTALL_URL = "git+https://github.com/NVIDIA/NemoClaw.git";
+const GITHUB_INSTALL_URL = "git+https://github.com/hollyhongever/ClawKeeper.git";
 const TEST_SYSTEM_PATH = "/usr/bin:/bin";
 
 function writeExecutable(target, contents) {
@@ -107,7 +107,7 @@ exit 1
 
     const output = `${result.stdout}${result.stderr}`;
     expect(result.status).not.toBe(0);
-    expect(output).toMatch(/v18\.19\.1.*found but NemoClaw requires/);
+    expect(output).toMatch(/v18\.19\.1.*found but ClawKeeper requires/);
     expect(output).toMatch(/upgrading via nvm/);
     expect(output).toMatch(/Failed to download nvm installer/);
   });
@@ -312,7 +312,7 @@ exit 98
 
     const output = `${result.stdout}${result.stderr}`;
     expect(result.status).toBe(0);
-    expect(output).toMatch(/NemoClaw Installer/);
+    expect(output).toMatch(/ClawKeeper Installer/);
     expect(output).not.toMatch(/deprecated compatibility wrapper/);
   });
 
@@ -332,7 +332,7 @@ exit 98
 
     const output = `${result.stdout}${result.stderr}`;
     expect(result.status).toBe(0);
-    expect(output).toMatch(/NemoClaw Installer/);
+    expect(output).toMatch(/ClawKeeper Installer/);
     expect(output).not.toMatch(/deprecated compatibility wrapper/);
   });
 
@@ -344,13 +344,13 @@ exit 98
 
     expect(result.status).toBe(0);
     const output = `${result.stdout}${result.stderr}`;
-    expect(output).toMatch(/NemoClaw Installer/);
+    expect(output).toMatch(/ClawKeeper Installer/);
     expect(output).toMatch(/--non-interactive/);
     expect(output).toMatch(/--version/);
-    expect(output).toMatch(/NEMOCLAW_PROVIDER/);
-    expect(output).toMatch(/NEMOCLAW_POLICY_MODE/);
-    expect(output).toMatch(/NEMOCLAW_SANDBOX_NAME/);
-    expect(output).toMatch(/nvidia\.com\/nemoclaw\.sh/);
+    expect(output).toMatch(/CLAWKEEPER_PROVIDER/);
+    expect(output).toMatch(/CLAWKEEPER_POLICY_MODE/);
+    expect(output).toMatch(/CLAWKEEPER_SANDBOX_NAME/);
+    expect(output).toMatch(/raw\.githubusercontent\.com\/hollyhongever\/ClawKeeper\/main\/install\.sh/);
   });
 
   it("--version exits 0 and prints the version number", () => {
@@ -361,7 +361,7 @@ exit 98
 
     expect(result.status).toBe(0);
     const output = `${result.stdout}${result.stderr}`;
-    expect(output.trim()).toMatch(/^nemoclaw-installer(?: v\d+\.\d+\.\d+(?:-.+)?)?$/);
+    expect(output.trim()).toMatch(/^clawkeeper-installer(?: v\d+\.\d+\.\d+(?:-.+)?)?$/);
     expect(output).not.toMatch(/0\.1\.0/);
   });
 
@@ -373,7 +373,7 @@ exit 98
 
     expect(result.status).toBe(0);
     const output = `${result.stdout}${result.stderr}`;
-    expect(output.trim()).toMatch(/^nemoclaw-installer(?: v\d+\.\d+\.\d+(?:-.+)?)?$/);
+    expect(output.trim()).toMatch(/^clawkeeper-installer(?: v\d+\.\d+\.\d+(?:-.+)?)?$/);
     expect(output).not.toMatch(/0\.1\.0/);
   });
 
@@ -386,7 +386,7 @@ exit 98
 
     expect(result.status).toBe(0);
     const output = `${result.stdout}${result.stderr}`;
-    expect(output).toMatch(/NemoClaw Installer/);
+    expect(output).toMatch(/ClawKeeper Installer/);
     expect(output).not.toMatch(/0\.1\.0/);
   });
 
@@ -399,7 +399,7 @@ exit 98
 
     expect(result.status).toBe(0);
     const output = `${result.stdout}${result.stderr}`;
-    expect(output.trim()).toBe("nemoclaw-installer");
+    expect(output.trim()).toBe("clawkeeper-installer");
     expect(output).not.toMatch(/0\.1\.0/);
   });
 
@@ -997,7 +997,7 @@ fi`,
     expect(output).not.toContain(
       "Onboarding did not run because this shell cannot resolve 'nemoclaw' yet.",
     );
-    expect(output).toMatch(/\$ nemoclaw my-assistant connect/);
+    expect(output).toMatch(/\$ clawkeeper my-assistant connect/);
   });
 });
 
@@ -1463,17 +1463,17 @@ describe("installer flag parsing", () => {
     expect(result.status).not.toBe(0);
     const output = `${result.stdout}${result.stderr}`;
     expect(output).toMatch(/Unknown option: --bogus/);
-    expect(output).toMatch(/NemoClaw Installer/); // usage was printed
+    expect(output).toMatch(/ClawKeeper Installer/); // usage was printed
   });
 
-  it("--help shows NEMOCLAW_INSTALL_TAG in environment section", () => {
+  it("--help shows CLAWKEEPER_INSTALL_TAG in environment section", () => {
     const result = spawnSync("bash", [INSTALLER, "--help"], {
       cwd: path.join(import.meta.dirname, ".."),
       encoding: "utf-8",
     });
 
     expect(result.status).toBe(0);
-    expect(`${result.stdout}${result.stderr}`).toMatch(/NEMOCLAW_INSTALL_TAG/);
+    expect(`${result.stdout}${result.stderr}`).toMatch(/CLAWKEEPER_INSTALL_TAG/);
   });
 });
 

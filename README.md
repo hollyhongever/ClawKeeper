@@ -1,36 +1,36 @@
-# 🦞 NVIDIA NemoClaw: Reference Stack for Running OpenClaw in OpenShell
+# 🦞 ClawKeeper: Reference Stack for Running OpenClaw in OpenShell
 
 <!-- start-badges -->
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue)](https://github.com/NVIDIA/NemoClaw/blob/main/LICENSE)
-[![Security Policy](https://img.shields.io/badge/Security-Report%20a%20Vulnerability-red)](https://github.com/NVIDIA/NemoClaw/blob/main/SECURITY.md)
-[![Project Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/NVIDIA/NemoClaw/blob/main/docs/about/release-notes.md)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue)](https://github.com/hollyhongever/ClawKeeper/blob/main/LICENSE)
+[![Security Policy](https://img.shields.io/badge/Security-Report%20a%20Vulnerability-red)](https://github.com/hollyhongever/ClawKeeper/blob/main/SECURITY.md)
+[![Project Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/hollyhongever/ClawKeeper/blob/main/docs/about/release-notes.md)
 [![Discord](https://img.shields.io/badge/Discord-Join-7289da)](https://discord.gg/XFpfPv9Uvx)
 <!-- end-badges -->
 
 <!-- start-intro -->
-NVIDIA NemoClaw is an open source reference stack that simplifies running [OpenClaw](https://openclaw.ai) always-on assistants more safely.
+ClawKeeper is an open source reference stack that simplifies running [OpenClaw](https://openclaw.ai) always-on assistants more safely.
 It installs the [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell) runtime, part of NVIDIA Agent Toolkit, which provides additional security for running autonomous agents.
 <!-- end-intro -->
 
 > **Alpha software**
 >
-> NemoClaw is available in early preview starting March 16, 2026.
+> ClawKeeper is available in early preview starting March 16, 2026.
 > This software is not production-ready.
 > Interfaces, APIs, and behavior may change without notice as we iterate on the design.
 > The project is shared to gather feedback and enable early experimentation.
 > We welcome issues and discussion from the community while the project evolves.
 
-NemoClaw adds guided onboarding, a hardened blueprint, state management, messaging bridges, routed inference, and layered protection on top of the [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell) runtime. For the full feature list, refer to [Overview](https://docs.nvidia.com/nemoclaw/latest/about/overview.html). For the system diagram, component model, and blueprint lifecycle, refer to [How It Works](https://docs.nvidia.com/nemoclaw/latest/about/how-it-works.html) and [Architecture](https://docs.nvidia.com/nemoclaw/latest/reference/architecture.html).
+ClawKeeper adds guided onboarding, a hardened blueprint, state management, messaging bridges, routed inference, and layered protection on top of the [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell) runtime. For the full feature list, refer to [Overview](https://docs.nvidia.com/nemoclaw/latest/about/overview.html). For the system diagram, component model, and blueprint lifecycle, refer to [How It Works](https://docs.nvidia.com/nemoclaw/latest/about/how-it-works.html) and [Architecture](https://docs.nvidia.com/nemoclaw/latest/reference/architecture.html).
 
 ## Getting Started
 
-Follow these steps to install NemoClaw and run your first sandboxed OpenClaw agent.
+Follow these steps to install ClawKeeper and run your first sandboxed OpenClaw agent.
 
 <!-- start-quickstart-guide -->
 
 ### Prerequisites
 
-Before getting started, check the prerequisites to ensure you have the necessary software and hardware to run NemoClaw.
+Before getting started, check the prerequisites to ensure you have the necessary software and hardware to run ClawKeeper.
 
 #### Hardware
 
@@ -60,23 +60,24 @@ The sandbox image is approximately 2.4 GB compressed. During image push, the Doc
 | macOS (Apple Silicon) | Colima, Docker Desktop | Install Xcode Command Line Tools (`xcode-select --install`) and start the runtime before running the installer. |
 | macOS (Intel) | Podman | Not supported yet. Depends on OpenShell support for Podman on macOS. |
 | Windows WSL | Docker Desktop (WSL backend) | Supported target path. |
-| DGX Spark | Docker | Refer to the [DGX Spark setup guide](https://github.com/NVIDIA/NemoClaw/blob/main/spark-install.md) for cgroup v2 and Docker configuration. |
+| DGX Spark | Docker | Refer to the [DGX Spark setup guide](https://github.com/hollyhongever/ClawKeeper/blob/main/spark-install.md) for cgroup v2 and Docker configuration. |
 
-### Install NemoClaw and Onboard OpenClaw Agent
+### Install ClawKeeper and Onboard OpenClaw Agent
 
 Download and run the installer script.
 The script installs Node.js if it is not already present, then runs the guided onboard wizard to create a sandbox, configure inference, and apply security policies.
 
 > **ℹ️ Note**
 >
-> NemoClaw creates a fresh OpenClaw instance inside the sandbox during the onboarding process.
+> ClawKeeper creates a fresh OpenClaw instance inside the sandbox during the onboarding process.
 
 ```bash
-curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hollyhongever/ClawKeeper/main/install.sh | bash
 ```
 
 If you use nvm or fnm to manage Node.js, the installer may not update your current shell's PATH.
-If `nemoclaw` is not found after install, run `source ~/.bashrc` (or `source ~/.zshrc` for zsh) or open a new terminal.
+If `clawkeeper` is not found after install, run `source ~/.bashrc` (or `source ~/.zshrc` for zsh) or open a new terminal.
+Legacy command `nemoclaw` remains available as a compatibility alias.
 
 When the install completes, a summary confirms the running environment:
 
@@ -85,9 +86,9 @@ When the install completes, a summary confirms the running environment:
 Sandbox      my-assistant (Landlock + seccomp + netns)
 Model        nvidia/nemotron-3-super-120b-a12b (NVIDIA Endpoints)
 ──────────────────────────────────────────────────
-Run:         nemoclaw my-assistant connect
-Status:      nemoclaw my-assistant status
-Logs:        nemoclaw my-assistant logs --follow
+Run:         clawkeeper my-assistant connect
+Status:      clawkeeper my-assistant status
+Logs:        clawkeeper my-assistant logs --follow
 ──────────────────────────────────────────────────
 
 [INFO]  === Installation complete ===
@@ -98,7 +99,7 @@ Logs:        nemoclaw my-assistant logs --follow
 Connect to the sandbox, then chat with the agent through the TUI or the CLI.
 
 ```bash
-nemoclaw my-assistant connect
+clawkeeper my-assistant connect
 ```
 
 In the sandbox shell, open the OpenClaw terminal UI and start a chat:
@@ -115,17 +116,17 @@ openclaw agent --agent main --local -m "hello" --session-id test
 
 ### Uninstall
 
-To remove NemoClaw and all resources created during setup, run the uninstall script:
+To remove ClawKeeper and all resources created during setup, run the uninstall script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hollyhongever/ClawKeeper/main/uninstall.sh | bash
 ```
 
 | Flag               | Effect                                              |
 |--------------------|-----------------------------------------------------|
 | `--yes`            | Skip the confirmation prompt.                       |
 | `--keep-openshell` | Leave the `openshell` binary installed.              |
-| `--delete-models`  | Also remove NemoClaw-pulled Ollama models.           |
+| `--delete-models`  | Also remove ClawKeeper-pulled Ollama models.         |
 
 For troubleshooting installation or onboarding issues, see the [Troubleshooting guide](https://docs.nvidia.com/nemoclaw/latest/reference/troubleshooting.html).
 
@@ -133,11 +134,11 @@ For troubleshooting installation or onboarding issues, see the [Troubleshooting 
 
 ## Documentation
 
-Refer to the following pages on the official documentation website for more information on NemoClaw.
+Refer to the following pages on the official documentation website for more information on ClawKeeper.
 
 | Page | Description |
 |------|-------------|
-| [Overview](https://docs.nvidia.com/nemoclaw/latest/about/overview.html) | What NemoClaw does and how it fits together. |
+| [Overview](https://docs.nvidia.com/nemoclaw/latest/about/overview.html) | What ClawKeeper does and how it fits together. |
 | [How It Works](https://docs.nvidia.com/nemoclaw/latest/about/how-it-works.html) | Plugin, blueprint, sandbox lifecycle, and protection layers. |
 | [Architecture](https://docs.nvidia.com/nemoclaw/latest/reference/architecture.html) | Plugin structure, blueprint lifecycle, sandbox environment, and host-side state. |
 | [Inference Options](https://docs.nvidia.com/nemoclaw/latest/inference/inference-options.html) | Supported providers, validation, and routed inference configuration. |
@@ -145,15 +146,15 @@ Refer to the following pages on the official documentation website for more info
 | [Customize Network Policy](https://docs.nvidia.com/nemoclaw/latest/network-policy/customize-network-policy.html) | Static and dynamic policy changes, presets. |
 | [Security Best Practices](https://docs.nvidia.com/nemoclaw/latest/security/best-practices.html) | Controls reference, risk framework, and posture profiles for sandbox security. |
 | [Sandbox Hardening](https://docs.nvidia.com/nemoclaw/latest/deployment/sandbox-hardening.html) | Container security measures, capability drops, process limits. |
-| [CLI Commands](https://docs.nvidia.com/nemoclaw/latest/reference/commands.html) | Full NemoClaw CLI command reference. |
+| [CLI Commands](https://docs.nvidia.com/nemoclaw/latest/reference/commands.html) | Full ClawKeeper CLI command reference. |
 | [Troubleshooting](https://docs.nvidia.com/nemoclaw/latest/reference/troubleshooting.html) | Common issues and resolution steps. |
 
 ## Project Structure
 
-The following directories make up the NemoClaw repository.
+The following directories make up the ClawKeeper repository.
 
 ```text
-NemoClaw/
+ClawKeeper/
 ├── bin/              # CLI entry point and library modules (CJS)
 ├── nemoclaw/         # TypeScript plugin (Commander CLI extension)
 │   └── src/
@@ -168,11 +169,11 @@ NemoClaw/
 
 ## Community
 
-Join the NemoClaw community to ask questions, share feedback, and report issues.
+Join the ClawKeeper community to ask questions, share feedback, and report issues.
 
 - [Discord](https://discord.gg/XFpfPv9Uvx)
-- [GitHub Discussions](https://github.com/NVIDIA/NemoClaw/discussions)
-- [GitHub Issues](https://github.com/NVIDIA/NemoClaw/issues)
+- [GitHub Discussions](https://github.com/hollyhongever/ClawKeeper/discussions)
+- [GitHub Issues](https://github.com/hollyhongever/ClawKeeper/issues)
 
 ## Contributing
 
@@ -181,7 +182,7 @@ We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for development
 ## Security
 
 NVIDIA takes security seriously.
-If you discover a vulnerability in NemoClaw, **DO NOT open a public issue.**
+If you discover a vulnerability in ClawKeeper, **DO NOT open a public issue.**
 Use one of the private reporting channels described in [SECURITY.md](SECURITY.md):
 
 - Submit a report through the [NVIDIA Vulnerability Disclosure Program](https://www.nvidia.com/en-us/security/report-vulnerability/).

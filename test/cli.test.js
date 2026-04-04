@@ -150,7 +150,7 @@ describe("CLI dispatch", () => {
   it("debug --help exits 0 and shows usage", () => {
     const r = run("debug --help");
     expect(r.code).toBe(0);
-    expect(r.out.includes("Collect NemoClaw diagnostic information")).toBeTruthy();
+    expect(r.out.includes("Collect ClawKeeper diagnostic information")).toBeTruthy();
     expect(r.out.includes("--quick")).toBeTruthy();
     expect(r.out.includes("--output")).toBeTruthy();
   });
@@ -174,7 +174,7 @@ describe("CLI dispatch", () => {
     const r = run("help");
     expect(r.code).toBe(0);
     expect(r.out.includes("Troubleshooting")).toBeTruthy();
-    expect(r.out.includes("nemoclaw debug")).toBeTruthy();
+    expect(r.out.includes("clawkeeper debug")).toBeTruthy();
   });
 
   it("maps --follow to openshell --tail", () => {
@@ -639,8 +639,8 @@ describe("CLI dispatch", () => {
     });
 
     expect(r.code).toBe(1);
-    expect(r.out.includes("too old or incompatible with `nemoclaw logs`")).toBeTruthy();
-    expect(r.out.includes("Upgrade OpenShell by rerunning `nemoclaw onboard`")).toBeTruthy();
+    expect(r.out.includes("too old or incompatible with `clawkeeper logs`")).toBeTruthy();
+    expect(r.out.includes("Upgrade OpenShell by rerunning `clawkeeper onboard`")).toBeTruthy();
   });
 
   it("connect does not pre-start a duplicate port forward", () => {
@@ -1295,7 +1295,7 @@ describe("CLI dispatch", () => {
 
     expect(r.code).toBe(1);
     expect(r.out.includes("Unknown command: beta")).toBeTruthy();
-    expect(r.out.includes("Try: nemoclaw <sandbox-name> connect")).toBeTruthy();
+    expect(r.out.includes("Try: clawkeeper <sandbox-name> connect")).toBeTruthy();
   });
 
   it("preserves SIGINT exit semantics for logs --follow", () => {
@@ -1456,7 +1456,7 @@ describe("CLI dispatch", () => {
     });
 
     expect(r.code).toBe(0);
-    expect(r.out.includes("Recovered NemoClaw gateway runtime")).toBeTruthy();
+    expect(r.out.includes("Recovered ClawKeeper gateway runtime")).toBeTruthy();
     expect(r.out.includes("Sandbox: alpha")).toBeTruthy();
   });
 

@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * Handler for the /nemoclaw slash command (chat interface).
+ * Handler for the /clawkeeper slash command (chat interface).
  *
  * Supports subcommands:
- *   /nemoclaw status   - show sandbox/blueprint/inference state
- *   /nemoclaw eject    - rollback to host installation
- *   /nemoclaw          - show help
+ *   /clawkeeper status   - show sandbox/blueprint/inference state
+ *   /clawkeeper eject    - rollback to host installation
+ *   /clawkeeper          - show help
  */
 
 import type { PluginCommandContext, PluginCommandResult, OpenClawPluginApi } from "../index.js";
@@ -39,20 +39,22 @@ export function handleSlashCommand(
 function slashHelp(): PluginCommandResult {
   return {
     text: [
-      "**NemoClaw**",
+      "**ClawKeeper**",
       "",
-      "Usage: `/nemoclaw <subcommand>`",
+      "Usage: `/clawkeeper <subcommand>`",
+      "Legacy alias: `/nemoclaw <subcommand>`",
       "",
       "Subcommands:",
       "  `status`  - Show sandbox, blueprint, and inference state",
       "  `eject`   - Show rollback instructions",
       "  `onboard` - Show onboarding status and instructions",
       "",
-      "For full management use the NemoClaw CLI:",
-      "  `nemoclaw <name> status`",
-      "  `nemoclaw <name> connect`",
-      "  `nemoclaw <name> logs`",
-      "  `nemoclaw <name> destroy`",
+      "For full management use the ClawKeeper CLI:",
+      "  `clawkeeper <name> status`",
+      "  `clawkeeper <name> connect`",
+      "  `clawkeeper <name> logs`",
+      "  `clawkeeper <name> destroy`",
+      "Legacy CLI alias remains available: `nemoclaw`",
     ].join("\n"),
   };
 }
@@ -62,12 +64,12 @@ function slashStatus(): PluginCommandResult {
 
   if (!state.lastAction) {
     return {
-      text: "**NemoClaw**: No operations performed yet. Run `nemoclaw onboard` to get started.",
+      text: "**ClawKeeper**: No operations performed yet. Run `clawkeeper onboard` to get started.",
     };
   }
 
   const lines = [
-    "**NemoClaw Status**",
+    "**ClawKeeper Status**",
     "",
     `Last action: ${state.lastAction}`,
     `Blueprint: ${state.blueprintVersion ?? "unknown"}`,
@@ -88,7 +90,7 @@ function slashOnboard(): PluginCommandResult {
   if (config) {
     return {
       text: [
-        "**NemoClaw Onboard Status**",
+        "**ClawKeeper Onboard Status**",
         "",
         `Endpoint: ${describeOnboardEndpoint(config)}`,
         `Provider: ${describeOnboardProvider(config)}`,
@@ -98,7 +100,7 @@ function slashOnboard(): PluginCommandResult {
         `Profile: ${config.profile}`,
         `Onboarded: ${config.onboardedAt}`,
         "",
-        "To reconfigure, run: `nemoclaw onboard`",
+        "To reconfigure, run: `clawkeeper onboard`",
       ]
         .filter(Boolean)
         .join("\n"),
@@ -106,12 +108,12 @@ function slashOnboard(): PluginCommandResult {
   }
   return {
     text: [
-      "**NemoClaw Onboarding**",
+      "**ClawKeeper Onboarding**",
       "",
       "No configuration found. Run the onboard command to set up inference:",
       "",
       "```",
-      "nemoclaw onboard",
+      "clawkeeper onboard",
       "```",
     ].join("\n"),
   };
@@ -121,7 +123,7 @@ function slashEject(): PluginCommandResult {
   const state = loadState();
 
   if (!state.lastAction) {
-    return { text: "No NemoClaw deployment found. Nothing to eject from." };
+    return { text: "No ClawKeeper deployment found. Nothing to eject from." };
   }
 
   if (!state.migrationSnapshot && !state.hostBackupPath) {
@@ -132,12 +134,12 @@ function slashEject(): PluginCommandResult {
 
   return {
     text: [
-      "**Eject from NemoClaw**",
+      "**Eject from ClawKeeper**",
       "",
       "To rollback to your host OpenClaw installation, run:",
       "",
       "```",
-      "nemoclaw <name> destroy",
+      "clawkeeper <name> destroy",
       "```",
       "",
       `Snapshot: ${state.migrationSnapshot ?? state.hostBackupPath ?? "none"}`,

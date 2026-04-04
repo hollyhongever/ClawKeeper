@@ -1,8 +1,8 @@
 {
   "id": "nemoclaw",
-  "name": "NemoClaw",
+  "name": "ClawKeeper",
   "version": "0.1.0",
-  "description": "Migrate and run OpenClaw inside OpenShell with optional NIM-backed inference",
+  "description": "ClawKeeper: run OpenClaw inside OpenShell with optional NIM-backed inference",
   "configSchema": {
     "type": "object",
     "properties": {

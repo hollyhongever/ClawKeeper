@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * NemoClaw — OpenClaw Plugin for OpenShell
+ * ClawKeeper — OpenClaw Plugin for OpenShell
  *
  * Uses the real OpenClaw plugin API. Types defined locally are minimal stubs
  * that match the OpenClaw SDK interfaces available at runtime via
@@ -235,10 +235,16 @@ export function getPluginConfig(api: OpenClawPluginApi): NemoClawConfig {
 // ---------------------------------------------------------------------------
 
 export default function register(api: OpenClawPluginApi): void {
-  // 1. Register /nemoclaw slash command (chat interface)
+  // 1. Register slash commands (chat interface)
+  api.registerCommand({
+    name: "clawkeeper",
+    description: "ClawKeeper sandbox management (status, eject).",
+    acceptsArgs: true,
+    handler: (ctx) => handleSlashCommand(ctx, api),
+  });
   api.registerCommand({
     name: "nemoclaw",
-    description: "NemoClaw sandbox management (status, eject).",
+    description: "Legacy alias for ClawKeeper sandbox management (status, eject).",
     acceptsArgs: true,
     handler: (ctx) => handleSlashCommand(ctx, api),
   });
@@ -254,12 +260,12 @@ export default function register(api: OpenClawPluginApi): void {
 
   api.logger.info("");
   api.logger.info("  ┌─────────────────────────────────────────────────────┐");
-  api.logger.info("  │  NemoClaw registered                                │");
+  api.logger.info("  │  ClawKeeper registered                              │");
   api.logger.info("  │                                                     │");
   api.logger.info(`  │  Endpoint:  ${bannerEndpoint.padEnd(40)}│`);
   api.logger.info(`  │  Provider:  ${bannerProvider.padEnd(40)}│`);
   api.logger.info(`  │  Model:     ${bannerModel.padEnd(40)}│`);
-  api.logger.info("  │  Slash:     /nemoclaw                               │");
+  api.logger.info("  │  Slash:     /clawkeeper (alias: /nemoclaw)          │");
   api.logger.info("  └─────────────────────────────────────────────────────┘");
   api.logger.info("");
 }

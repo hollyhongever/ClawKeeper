@@ -242,6 +242,7 @@ Switch Inference Providers <inference/switch-inference-providers>
 
 Approve or Deny Network Requests <network-policy/approve-network-requests>
 Customize the Network Policy <network-policy/customize-network-policy>
+Use Security Policy Templates <network-policy/security-policy-templates>
 ```
 
 ```{toctree}

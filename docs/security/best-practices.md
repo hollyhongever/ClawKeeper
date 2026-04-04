@@ -28,6 +28,24 @@ This page documents every configurable knob, its default, what it protects, the 
 
 For background on how the layers fit together, refer to [How It Works](../about/how-it-works.md).
 
+## Deterministic Secret Redaction
+
+NemoClaw applies the same high-confidence redaction rules across all runtime surfaces:
+
+- CLI runtime output (command output and error surfaces)
+- `nemoclaw debug` collection artifacts
+- onboard session persistence (`~/.nemoclaw/onboard-session.json`)
+
+The redactor deterministically replaces sensitive values with `<REDACTED>` for:
+
+- API keys and common key formats (for example `nvapi-`, `nvcf-`, `ghp_`, `github_pat_`, `sk-`)
+- Bearer tokens (`Authorization: Bearer ...`)
+- Common secret assignment patterns (`..._KEY=...`, `...TOKEN: ...`, `...SECRET=...`)
+- Credential-bearing URLs and token-like query parameters (`token`, `auth`, `sig`, `signature`, `access_token`)
+
+For incident replay and postmortem workflows, identical input always produces identical redacted output.
+This makes debug bundles, logs, and onboard session traces consistent and safe to correlate.
+
 <!-- TODO: uncomment after the OpenShell docs are published
 :::{seealso}
 OpenShell enforces the platform-level mechanisms that NemoClaw configures, including network namespace isolation, seccomp filters, SSRF protection, TLS termination, and gateway authentication.

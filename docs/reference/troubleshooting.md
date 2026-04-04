@@ -272,3 +272,15 @@ $ nemoclaw <name> logs
 ```
 
 Use `--follow` to stream logs in real time while debugging.
+
+### Security rollout gate script fails
+
+If pre-release checks fail, run the rollout gate script from repository root:
+
+```console
+$ bash scripts/check-security-rollout.sh
+```
+
+This script validates that rollout docs, navigation entries, and command references are present.
+If it reports missing references, repair the affected docs and re-run.
+For stage-level rollout and acceptance guidance, refer to [Public Exposure Rollout Playbook](../security/public-exposure-rollout-playbook.md).

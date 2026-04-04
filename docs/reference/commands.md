@@ -71,6 +71,8 @@ $ clawkeeper onboard
 The wizard prompts for a provider first, then collects the provider credential if needed.
 Supported non-experimental choices include NVIDIA Endpoints, OpenAI, Anthropic, Google Gemini, and compatible OpenAI or Anthropic endpoints.
 Credentials are stored in `~/.nemoclaw/credentials.json`.
+Set `NEMOCLAW_CRED_STORE_KEY` and run `clawkeeper security set-password` to migrate plaintext credentials into an encrypted AES-256-GCM envelope (scrypt KDF).
+Use `clawkeeper security status` to confirm the active storage mode and key count.
 The legacy `nemoclaw setup` command is deprecated; use `clawkeeper onboard` instead.
 
 If you enable Brave Search during onboarding, ClawKeeper currently stores the Brave API key in the sandbox's OpenClaw configuration.
@@ -228,6 +230,25 @@ By default this validates `nemoclaw/security-policy.yaml`.
 
 ```console
 $ clawkeeper security policy validate [--file <path>]
+```
+
+### `clawkeeper security status`
+
+Show credential-store mode (`plaintext` or `encrypted`), stored credential key count, and whether `NEMOCLAW_CRED_STORE_KEY` is detected in the current environment.
+
+```console
+$ clawkeeper security status
+```
+
+### `clawkeeper security set-password`
+
+Set or rotate the credential-store password and re-encrypt `~/.nemoclaw/credentials.json`.
+In non-interactive contexts this command uses `NEMOCLAW_CRED_STORE_KEY`.
+In interactive terminals, you can enter and confirm a password if the environment variable is not set.
+
+```console
+$ export NEMOCLAW_CRED_STORE_KEY='my-credential-store-password'
+$ clawkeeper security set-password
 ```
 
 ### `clawkeeper security events`

@@ -1400,8 +1400,10 @@ function securityHelp() {
   console.log("");
   console.log("  Security commands:");
   console.log(`    ${preferredCmd("security policy validate [--file PATH]")}`);
-  console.log(`    ${preferredCmd("security events [--limit N] [--json] [--file PATH]")}`);
-  console.log(`    ${preferredCmd("security replay <event-id> [--file PATH]")}`);
+  console.log(
+    `    ${preferredCmd("security events [--limit N] [--action A] [--hook H] [--risk R] [--id PATTERN] [--json] [--file PATH]")}`,
+  );
+  console.log(`    ${preferredCmd("security replay <event-id> [--json] [--file PATH]")}`);
   console.log("");
 }
 
@@ -1424,25 +1426,41 @@ function handleSecurityPolicyValidate(args) {
 
 function handleSecurityEvents(args) {
   const limit = Number.parseInt(optionValue(args, "--limit", "50"), 10) || 50;
+  const action = optionValue(args, "--action", "");
+  const hook = optionValue(args, "--hook", "");
+  const risk = optionValue(args, "--risk", "");
+  const id = optionValue(args, "--id", "");
   const eventsPath = optionValue(args, "--file", security.defaultEventsPath());
   const asJson = args.includes("--json");
-  const { path: resolvedPath, events } = security.readEvents(eventsPath, limit);
+  const result = security.readEvents(eventsPath, { limit, action, hook, risk, id });
 
   if (asJson) {
-    console.log(JSON.stringify({ path: resolvedPath, events }, null, 2));
+    console.log(JSON.stringify(result, null, 2));
     return;
   }
 
-  console.log(`  Security events (${events.length}) from ${resolvedPath}`);
-  if (events.length === 0) {
+  console.log(`  Security events (${result.returnedEvents}/${result.totalEvents}) from ${result.path}`);
+  if (result.malformedLines > 0) {
+    console.log(`  Note: skipped ${result.malformedLines} malformed event line(s).`);
+  }
+  if (result.filters.action || result.filters.hook || result.filters.risk || result.filters.id) {
+    const filters = [];
+    if (result.filters.action) filters.push(`action=${result.filters.action}`);
+    if (result.filters.hook) filters.push(`hook=${result.filters.hook}`);
+    if (result.filters.risk) filters.push(`risk=${result.filters.risk}`);
+    if (result.filters.id) filters.push(`id~=${result.filters.id}`);
+    console.log(`  Filters: ${filters.join(", ")}`);
+  }
+
+  if (result.events.length === 0) {
     console.log("  No events recorded yet.");
     return;
   }
-  for (const event of events) {
+  for (const event of result.events) {
     const ts = event.timestamp || "unknown-time";
     const hook = event.hook || "unknown-hook";
     const id = event.id || "unknown-id";
-    const action = event.effectiveAction || event.action || "allow";
+    const action = event.action || "allow";
     const risk = event.riskLevel || "low";
     const target = event.target || "unknown";
     console.log(`  - ${ts}  ${hook}  ${action}  ${risk}  ${target}  (${id})`);
@@ -1455,9 +1473,23 @@ function handleSecurityReplay(args) {
     console.error("  Missing event ID. Usage: clawkeeper security replay <event-id> [--file PATH]");
     process.exit(1);
   }
+  const asJson = args.includes("--json");
   const eventsPath = optionValue(args, "--file", security.defaultEventsPath());
-  const { path: resolvedPath, event } = security.replayEvent(eventId, eventsPath);
+  const replay = security.replayEvent(eventId, eventsPath);
+  const { path: resolvedPath, event, matches, totalEvents, malformedLines } = replay;
+  if (asJson) {
+    console.log(JSON.stringify(replay, null, 2));
+    if (!event) {
+      process.exit(1);
+    }
+    return;
+  }
   if (!event) {
+    if (matches > 1) {
+      console.error(
+        `  Event ID prefix is ambiguous in ${resolvedPath}: ${eventId} (matches=${matches}).`,
+      );
+    }
     console.error(`  Event not found in ${resolvedPath}: ${eventId}`);
     process.exit(1);
   }
@@ -1468,6 +1500,7 @@ function handleSecurityReplay(args) {
   console.log(`  Risk: ${event.riskLevel} (${event.riskScore})`);
   console.log(`  Target: ${event.target}`);
   console.log(`  Reason: ${event.reason}`);
+  console.log(`  Dataset: total=${totalEvents}, malformed=${malformedLines}, matches=${matches}`);
   if (Array.isArray(event.evidence) && event.evidence.length > 0) {
     console.log("  Evidence:");
     for (const item of event.evidence) {
@@ -1533,8 +1566,8 @@ function help() {
 
   ${G}Security:${R}
     ${preferredCmd("security policy validate [--file PATH]")}
-    ${preferredCmd("security events [--limit N] [--json] [--file PATH]")}
-    ${preferredCmd("security replay <event-id> [--file PATH]")}
+    ${preferredCmd("security events [--limit N] [--action A] [--hook H] [--risk R] [--id PATTERN] [--json] [--file PATH]")}
+    ${preferredCmd("security replay <event-id> [--json] [--file PATH]")}
 
   Troubleshooting:
     ${preferredCmd("debug [--quick]")}         Collect diagnostics for bug reports

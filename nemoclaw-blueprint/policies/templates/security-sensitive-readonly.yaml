@@ -1,0 +1,17 @@
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only:
+    - /usr
+    - /lib
+    - /proc
+    - /etc
+    - /var/log
+    - /sandbox/.openclaw
+    - /sandbox/.openclaw-data/credentials
+    - /sandbox/.openclaw-data/tokens
+  read_write:
+    - /sandbox
+    - /tmp
+    - /dev/null

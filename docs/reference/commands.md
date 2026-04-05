@@ -221,6 +221,32 @@ Show the sandbox list and the status of auxiliary services.
 $ clawkeeper status
 ```
 
+### `clawkeeper security policy validate`
+
+Validate a ClawKeeper security policy file before enforcing semantic security hooks.
+By default this validates `nemoclaw/security-policy.yaml`.
+
+```console
+$ clawkeeper security policy validate [--file <path>]
+```
+
+### `clawkeeper security events`
+
+Print recent structured security events from the JSONL audit log.
+By default this reads `~/.nemoclaw/security/events.jsonl`.
+
+```console
+$ clawkeeper security events [--limit <n>] [--json] [--file <path>]
+```
+
+### `clawkeeper security replay`
+
+Show full details for a single security event by ID.
+
+```console
+$ clawkeeper security replay <event-id> [--file <path>]
+```
+
 ### `clawkeeper setup-spark`
 
 Set up ClawKeeper on DGX Spark.

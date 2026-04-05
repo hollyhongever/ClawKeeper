@@ -1,0 +1,83 @@
+version: 1
+
+decision_matrix:
+  critical: block
+  high: require_approval
+  medium: allow
+  low: allow
+
+command_rules:
+  critical_patterns:
+    - '(^|\s)rm\s+-rf\s+/(\s|$)'
+    - '(^|\s)mkfs(\.|\s)'
+    - '(^|\s)dd\s+if='
+    - '(^|\s)(shutdown|reboot|poweroff)(\s|$)'
+    - '(:\(\)\s*\{\s*:\|:\s*&\s*\};:)'
+  high_patterns:
+    - 'https?://[^\s]+\s*\|\s*(bash|sh)'
+    - '(^|\s)(chmod\s+777|chown\s+-R\s+root)(\s|$)'
+    - '(^|\s)(iptables|ufw|firewall-cmd)(\s|$)'
+  medium_patterns:
+    - '(^|\s)curl(\s|$)'
+    - '(^|\s)wget(\s|$)'
+    - '(^|\s)scp(\s|$)'
+
+path_rules:
+  critical_prefixes:
+    - /etc
+    - /root
+    - /var/lib/docker
+    - /sandbox/.openclaw
+  high_prefixes:
+    - /home
+    - /var/log
+    - /proc
+    - /dev
+  allow_prefixes:
+    - /sandbox
+    - /tmp
+
+network_rules:
+  critical_hosts:
+    - 169.254.169.254
+    - metadata.google.internal
+    - localhost
+    - 127.0.0.1
+  high_hosts:
+    - ngrok.io
+    - trycloudflare.com
+    - transfer.sh
+  allow_hosts:
+    - integrate.api.nvidia.com
+    - inference-api.nvidia.com
+
+install_rules:
+  critical_patterns:
+    - 'ignore\s+all\s+previous\s+instructions'
+    - 'process\.env\.[A-Z0-9_]{3,}'
+    - child_process
+    - 'https?://[^\s]+\s*\|\s*(bash|sh)'
+  high_patterns:
+    - 'prompt\s*injection'
+    - 'data\s*exfil'
+    - 'base64\s+-d'
+  medium_patterns:
+    - 'eval\('
+    - 'Function\('
+    - 'new\s+WebSocket\('
+  scanner_command: ""
+  scanner_args: []
+
+prompt_rules:
+  injection_patterns:
+    - 'ignore\s+system\s+instructions'
+    - 'disable\s+guardrails'
+    - 'developer\s+mode'
+    - jailbreak
+
+audit:
+  event_log_path: ~/.nemoclaw/security/events.jsonl
+  include_allow_events: false
+  webhook_on:
+    - block
+    - require_approval

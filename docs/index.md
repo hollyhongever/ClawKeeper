@@ -185,6 +185,16 @@ Controls reference, risk framework, and posture profiles for sandbox security.
 {bdg-secondary}`Concept`
 :::
 
+:::{grid-item-card} Public Exposure Rollout Playbook
+:link: security/public-exposure-rollout-playbook
+:link-type: doc
+
+Operational rollout guidance for staged `audit`, `warn`, and `enforce` promotion.
+
++++
+{bdg-secondary}`How-To`
+:::
+
 :::{grid-item-card} How-To Guides
 :link: inference/switch-inference-providers
 :link-type: doc
@@ -250,6 +260,7 @@ Use Security Policy Templates <network-policy/security-policy-templates>
 :hidden:
 
 Security Best Practices <security/best-practices>
+Public Exposure Rollout Playbook <security/public-exposure-rollout-playbook>
 ClawKeeper Security Enhancement Plan <security/clawkeeper-security-enhancement-plan>
 Security Module Updates <security/security-module-updates>
 ```

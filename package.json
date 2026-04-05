@@ -1,7 +1,7 @@
 {
   "name": "nemoclaw",
   "version": "0.1.0",
-  "description": "ClawKeeper — run OpenClaw inside OpenShell with NVIDIA inference",
+  "description": "ClawKeeper — security-focused OpenClaw operations on OpenShell",
   "license": "Apache-2.0",
   "bin": {
     "clawkeeper": "./bin/nemoclaw.js",
@@ -41,7 +41,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/NVIDIA/NemoClaw.git"
+    "url": "https://github.com/hollyhongever/ClawKeeper.git"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.5.0",

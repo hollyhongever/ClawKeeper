@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent / "_ext"))
 
-project = "NVIDIA NemoClaw Developer Guide"
+project = "ClawKeeper Developer Guide"
 this_year = date.today().year
 copyright = f"2025-{this_year}, NVIDIA Corporation"
 author = "NVIDIA Corporation"
@@ -101,18 +101,18 @@ highlight_language = "console"
 html_theme_options = {
     # "public_docs_features": True, # TODO: Uncomment this when the docs are public
     "announcement": (
-        "&#x1F514; NVIDIA NemoClaw is <strong>alpha software</strong>. APIs and behavior"
+        "&#x1F514; ClawKeeper is <strong>alpha software</strong>. APIs and behavior"
         " may change without notice. Do not use in production."
     ),
     "icon_links": [
         {
-            "name": "NemoClaw GitHub",
-            "url": "https://github.com/NVIDIA/NemoClaw",
+            "name": "ClawKeeper GitHub",
+            "url": "https://github.com/hollyhongever/ClawKeeper",
             "icon": "fa-brands fa-github",
             "type": "fontawesome",
         },
         {
-            "name": "NemoClaw Discord",
+            "name": "ClawKeeper Discord",
             "url": "https://discord.gg/XFpfPv9Uvx",
             "icon": "fa-brands fa-discord",
             "type": "fontawesome",
@@ -120,4 +120,4 @@ html_theme_options = {
     ],
 }
 
-html_baseurl = "https://docs.nvidia.com/nemoclaw/latest/"
+html_baseurl = "https://hollyhongever.github.io/ClawKeeper/"

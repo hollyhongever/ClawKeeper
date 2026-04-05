@@ -143,7 +143,14 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function pickMode(value: unknown, fallback: SecurityMode): SecurityMode {
-  if (value === "off" || value === "audit" || value === "enforce") return value;
+  if (
+    value === "off" ||
+    value === "audit" ||
+    value === "warn" ||
+    value === "enforce"
+  ) {
+    return value;
+  }
   return fallback;
 }
 

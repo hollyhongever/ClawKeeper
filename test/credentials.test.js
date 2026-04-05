@@ -64,6 +64,63 @@ describe("credential prompts", () => {
     expect(credentials.getCredential("EMPTY_VALUE")).toBe(null);
   });
 
+  it("auto-migrates plaintext credentials to encrypted envelope when password env is set", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-creds-"));
+    const credsDir = path.join(home, ".nemoclaw");
+    const credsFile = path.join(credsDir, "credentials.json");
+    fs.mkdirSync(credsDir, { recursive: true });
+    fs.writeFileSync(
+      credsFile,
+      JSON.stringify({ OPENAI_API_KEY: "sk-before-migration" }, null, 2),
+      "utf-8",
+    );
+
+    vi.stubEnv("NEMOCLAW_CRED_STORE_KEY", "migration-pass");
+    const credentials = await importCredentialsModule(home);
+
+    expect(credentials.loadCredentials()).toEqual({ OPENAI_API_KEY: "sk-before-migration" });
+    const migrated = JSON.parse(fs.readFileSync(credsFile, "utf-8"));
+    expect(migrated.format).toBe("nemoclaw.credentials.v1");
+    expect(migrated.encryption).toBe("aes-256-gcm");
+    expect(migrated.credentialCount).toBe(1);
+    expect(migrated.OPENAI_API_KEY).toBeUndefined();
+  });
+
+  it("reports encrypted-store access clearly when password is missing", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-creds-"));
+    vi.stubEnv("NEMOCLAW_CRED_STORE_KEY", "encrypt-pass");
+    const withPassword = await importCredentialsModule(home);
+    withPassword.saveCredential("NVIDIA_API_KEY", "nvapi-encrypted-key");
+
+    vi.unstubAllEnvs();
+    const credentials = await importCredentialsModule(home);
+
+    expect(() => credentials.loadCredentials()).toThrow(/Credential store is encrypted/);
+    expect(credentials.getCredential("NVIDIA_API_KEY")).toBe(null);
+  });
+
+  it("sets and rotates the credential-store password while preserving stored keys", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-creds-"));
+    const credentials = await importCredentialsModule(home);
+    credentials.saveCredential("TEST_KEY", "value-1");
+
+    const first = credentials.setCredentialStorePassword("first-password");
+    expect(first.previousMode).toBe("plaintext");
+    expect(first.mode).toBe("encrypted");
+    expect(first.credentialCount).toBe(1);
+
+    const second = credentials.setCredentialStorePassword("second-password", {
+      currentPassword: "first-password",
+    });
+    expect(second.previousMode).toBe("encrypted");
+    expect(second.mode).toBe("encrypted");
+    expect(second.credentialCount).toBe(1);
+
+    vi.stubEnv("NEMOCLAW_CRED_STORE_KEY", "second-password");
+    const reopened = await importCredentialsModule(home);
+    expect(reopened.getCredential("TEST_KEY")).toBe("value-1");
+  });
+
   it("exits cleanly when answers are staged through a pipe", () => {
     const script = `
       set -euo pipefail

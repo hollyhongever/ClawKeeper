@@ -37,6 +37,16 @@ describe("redact", () => {
     );
   });
 
+  it("redacts URL credentials and token-like query parameters", () => {
+    expect(
+      redact(
+        "visit https://alice:secret@example.com/v1/models?token=abc&sig=def&keep=yes#token=frag",
+      ),
+    ).toBe(
+      "visit https://example.com/v1/models?token=%3CREDACTED%3E&sig=%3CREDACTED%3E&keep=yes",
+    );
+  });
+
   it("handles multiple patterns in one string", () => {
     const input = "API_KEY=secret nvapi-abcdefghijk Bearer tok123";
     const result = redact(input);
@@ -48,5 +58,16 @@ describe("redact", () => {
   it("leaves clean text unchanged", () => {
     const clean = "Hello world, no secrets here";
     expect(redact(clean)).toBe(clean);
+  });
+
+  it("is deterministic for repeated identical input", () => {
+    const input =
+      "Authorization: Bearer abc123def456 API_KEY=secret https://alice:secret@example.com/?token=abc123";
+    const first = redact(input);
+    const second = redact(input);
+    expect(second).toBe(first);
+    expect(first).toBe(
+      "Authorization: Bearer <REDACTED> API_KEY=<REDACTED> https://example.com/?token=%3CREDACTED%3E",
+    );
   });
 });

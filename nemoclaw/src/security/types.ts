@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-export type SecurityMode = "off" | "audit" | "enforce";
+export type SecurityMode = "off" | "audit" | "warn" | "enforce";
 
 export type SecurityAction = "allow" | "block" | "require_approval";
 
@@ -79,6 +79,7 @@ export interface SecurityDecision {
   reason: string;
   evidence: SecurityEvidence[];
   recommendedAction?: SecurityAction;
+  rolloutStage?: SecurityMode;
 }
 
 export interface SecurityEventV1 {
@@ -90,6 +91,8 @@ export interface SecurityEventV1 {
   sandboxName: string;
   action: SecurityAction;
   effectiveAction: SecurityAction;
+  recommendedAction?: SecurityAction;
+  rolloutStage?: SecurityMode;
   riskLevel: SecurityRiskLevel;
   riskScore: number;
   reason: string;

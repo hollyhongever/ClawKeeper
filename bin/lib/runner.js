@@ -78,24 +78,22 @@ function runCapture(cmd, opts = {}) {
 
 /**
  * Redact known secret patterns from a string to prevent accidental leaks
- * in CLI log and error output. Covers NVIDIA API keys, bearer tokens,
- * generic API key assignments, and base64-style long tokens.
+ * in CLI log and error output.
  */
+const REDACTION_TOKEN = "<REDACTED>";
+const URL_PATTERN = /https?:\/\/[^\s'"`]+/g;
+const URL_TOKEN_PARAM_RE = /(^|[-_])(?:signature|sig|token|auth|access_token)$/i;
 const SECRET_PATTERNS = [
-  /nvapi-[A-Za-z0-9_-]{10,}/g,
-  /nvcf-[A-Za-z0-9_-]{10,}/g,
-  /ghp_[A-Za-z0-9_-]{10,}/g,
-  /(?<=Bearer\s+)[A-Za-z0-9_.+/=-]{10,}/gi,
-  /(?<=(?:_KEY|API_KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL)[=: ]['"]?)[A-Za-z0-9_.+/=-]{10,}/gi,
+  [
+    /((?:["'])?(?:[A-Za-z0-9_.-]*?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|credential|private[_-]?key|client[_-]?secret)|[A-Za-z0-9_.-]+_key)(?:["'])?\s*[:=]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s,&}"'\]]+)/gi,
+    `$1${REDACTION_TOKEN}`,
+  ],
+  [/\bnvapi-[A-Za-z0-9_-]{10,}\b/g, REDACTION_TOKEN],
+  [/\bnvcf-[A-Za-z0-9_-]{10,}\b/g, REDACTION_TOKEN],
+  [/\b(?:ghp_|github_pat_)[A-Za-z0-9_]{20,}\b/g, REDACTION_TOKEN],
+  [/\bsk-[A-Za-z0-9_-]{10,}\b/g, REDACTION_TOKEN],
+  [/(Bearer\s+)\S+/gi, `$1${REDACTION_TOKEN}`],
 ];
-
-/**
- * Partially redact a matched secret string: keep the first 4 chars and replace
- * the rest with asterisks (capped at 20 asterisks).
- */
-function redactMatch(match) {
-  return match.slice(0, 4) + "*".repeat(Math.min(match.length - 4, 20));
-}
 
 /**
  * Redact credentials from a URL string: clears url.password and blanks
@@ -106,14 +104,16 @@ function redactUrl(value) {
   if (typeof value !== "string" || value.length === 0) return value;
   try {
     const url = new URL(value);
-    if (url.password) {
-      url.password = "****";
+    if (url.username || url.password) {
+      url.username = "";
+      url.password = "";
     }
     for (const key of [...url.searchParams.keys()]) {
-      if (/(^|[-_])(?:signature|sig|token|auth|access_token)$/i.test(key)) {
-        url.searchParams.set(key, "****");
+      if (URL_TOKEN_PARAM_RE.test(key)) {
+        url.searchParams.set(key, REDACTION_TOKEN);
       }
     }
+    url.hash = "";
     return url.toString();
   } catch {
     return value;
@@ -126,10 +126,11 @@ function redactUrl(value) {
  */
 function redact(str) {
   if (typeof str !== "string") return str;
-  let out = str.replace(/https?:\/\/[^\s'"]+/g, redactUrl);
-  for (const pat of SECRET_PATTERNS) {
-    out = out.replace(pat, redactMatch);
+  let out = str;
+  for (const [pattern, replacement] of SECRET_PATTERNS) {
+    out = out.replace(pattern, replacement);
   }
+  out = out.replace(URL_PATTERN, redactUrl);
   return out;
 }
 

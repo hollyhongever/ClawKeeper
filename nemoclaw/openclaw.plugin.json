@@ -33,7 +33,7 @@
           "mode": {
             "type": "string",
             "description": "Security enforcement mode",
-            "enum": ["off", "audit", "enforce"],
+            "enum": ["off", "audit", "warn", "enforce"],
             "default": "enforce"
           },
           "policyPath": {

@@ -834,7 +834,10 @@ async function replaceNamedCredential(envName, label, helpUrl = null, validator 
     saveCredential(envName, key);
     process.env[envName] = key;
     console.log("");
-    console.log(`  Key saved to ~/.nemoclaw/credentials.json (mode 600)`);
+    console.log(`  Credential saved to ~/.nemoclaw/credentials.json`);
+    if (!process.env.NEMOCLAW_CRED_STORE_KEY) {
+      console.log("  Security tip: set NEMOCLAW_CRED_STORE_KEY and run `clawkeeper security set-password`.");
+    }
     console.log("");
     return key;
   }
@@ -3728,8 +3731,8 @@ function findOpenclawJsonPath(dir) {
 }
 
 /**
- * Pull gateway.auth.token from the sandbox image via openshell sandbox download
- * so onboard can print copy-paste Control UI URLs with #token= (same idea as nemoclaw-start.sh).
+ * Pull gateway.auth.token from the sandbox image via openshell sandbox download.
+ * This is used as a readiness signal for OpenClaw startup checks.
  */
 function fetchGatewayAuthTokenFromSandbox(sandboxName) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-token-"));
@@ -3773,8 +3776,6 @@ function printDashboard(sandboxName, model, provider, nimContainer = null) {
   else if (provider === "vllm-local") providerLabel = "Local vLLM";
   else if (provider === "ollama-local") providerLabel = "Local Ollama";
 
-  const token = fetchGatewayAuthTokenFromSandbox(sandboxName);
-
   console.log("");
   console.log(`  ${"─".repeat(50)}`);
   // console.log(`  Dashboard    http://localhost:18789/`);
@@ -3786,26 +3787,14 @@ function printDashboard(sandboxName, model, provider, nimContainer = null) {
   console.log(`  Status:      nemoclaw ${sandboxName} status`);
   console.log(`  Logs:        nemoclaw ${sandboxName} logs --follow`);
   console.log("");
-  if (token) {
-    console.log("  OpenClaw UI (tokenized URL; treat it like a password)");
-    console.log(`  Port ${CONTROL_UI_PORT} must be forwarded before opening this URL.`);
-    for (const url of buildControlUiUrls(token)) {
-      console.log(`  ${url}`);
-    }
-  } else {
-    note("  Could not read gateway token from the sandbox (download failed).");
-    console.log("  OpenClaw UI");
-    console.log(`  Port ${CONTROL_UI_PORT} must be forwarded before opening this URL.`);
-    for (const url of buildControlUiUrls()) {
-      console.log(`  ${url}`);
-    }
-    console.log(
-      `  Token:       nemoclaw ${sandboxName} connect  →  jq -r '.gateway.auth.token' /sandbox/.openclaw/openclaw.json`,
-    );
-    console.log(
-      `               append  #token=<token>  to the URL, or see /tmp/gateway.log inside the sandbox.`,
-    );
+  console.log("  OpenClaw UI");
+  console.log(`  Port ${CONTROL_UI_PORT} must be forwarded before opening this URL.`);
+  for (const url of buildControlUiUrls()) {
+    console.log(`  ${url}`);
   }
+  console.log(`  Security:    set ${"NEMOCLAW_CRED_STORE_KEY"} before storing credentials`);
+  console.log("               then run: clawkeeper security set-password");
+  console.log("               verify with: clawkeeper security status");
   console.log(`  ${"─".repeat(50)}`);
   console.log("");
 }

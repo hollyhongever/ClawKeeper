@@ -71,6 +71,8 @@ $ clawkeeper onboard
 The wizard prompts for a provider first, then collects the provider credential if needed.
 Supported non-experimental choices include NVIDIA Endpoints, OpenAI, Anthropic, Google Gemini, and compatible OpenAI or Anthropic endpoints.
 Credentials are stored in `~/.nemoclaw/credentials.json`.
+Set `NEMOCLAW_CRED_STORE_KEY` and run `clawkeeper security set-password` to migrate plaintext credentials into an encrypted AES-256-GCM envelope (scrypt KDF).
+Use `clawkeeper security status` to confirm the active storage mode and key count.
 The legacy `nemoclaw setup` command is deprecated; use `clawkeeper onboard` instead.
 
 If you enable Brave Search during onboarding, ClawKeeper currently stores the Brave API key in the sandbox's OpenClaw configuration.
@@ -230,22 +232,61 @@ By default this validates `nemoclaw/security-policy.yaml`.
 $ clawkeeper security policy validate [--file <path>]
 ```
 
+### `clawkeeper security status`
+
+Show credential-store mode (`plaintext` or `encrypted`), stored credential key count, and whether `NEMOCLAW_CRED_STORE_KEY` is detected in the current environment.
+
+```console
+$ clawkeeper security status
+```
+
+### `clawkeeper security set-password`
+
+Set or rotate the credential-store password and re-encrypt `~/.nemoclaw/credentials.json`.
+In non-interactive contexts this command uses `NEMOCLAW_CRED_STORE_KEY`.
+In interactive terminals, you can enter and confirm a password if the environment variable is not set.
+
+```console
+$ export NEMOCLAW_CRED_STORE_KEY='my-credential-store-password'
+$ clawkeeper security set-password
+```
+
 ### `clawkeeper security events`
 
 Print recent structured security events from the JSONL audit log.
 By default this reads `~/.nemoclaw/security/events.jsonl`.
 
 ```console
-$ clawkeeper security events [--limit <n>] [--json] [--file <path>]
+$ clawkeeper security events [--limit <n>] [--action <name>] [--hook <name>] [--risk <level>] [--id <pattern>] [--json] [--file <path>]
 ```
+
+Use filters to narrow event lists for demos and incident triage.
+Malformed JSONL records are skipped so listing remains resilient, and the CLI reports how many malformed lines were ignored.
+
+| Flag | Description |
+|------|-------------|
+| `--limit <n>` | Maximum number of matching events to print (default: `50`) |
+| `--action <name>` | Filter by effective action (`allow`, `block`, `require_approval`) |
+| `--hook <name>` | Filter by hook name (for example `before_tool_call`) |
+| `--risk <level>` | Filter by risk level (`low`, `medium`, `high`, `critical`) |
+| `--id <pattern>` | Filter by event ID substring match |
+| `--json` | Print structured JSON output including filters and malformed-line count |
+| `--file <path>` | Read from an alternate JSONL audit log file |
 
 ### `clawkeeper security replay`
 
 Show full details for a single security event by ID.
+Replay first checks exact IDs, then falls back to ID prefix matching.
+If the provided prefix is ambiguous (matches multiple events), the command exits non-zero.
 
 ```console
-$ clawkeeper security replay <event-id> [--file <path>]
+$ clawkeeper security replay <event-id> [--json] [--file <path>]
 ```
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Print replay result as JSON (includes dataset totals and match count) |
+| `--file <path>` | Read from an alternate JSONL audit log file |
 
 ### `clawkeeper setup-spark`
 

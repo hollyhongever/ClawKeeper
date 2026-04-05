@@ -9,10 +9,11 @@ import { describe, expect, it } from "vitest";
 
 const CLI = path.join(import.meta.dirname, "..", "bin", "nemoclaw.js");
 
-function runWithEnv(args, env = {}) {
+function runWithEnv(args, env = {}, opts = {}) {
   try {
     const out = execSync(`node "${CLI}" ${args}`, {
       encoding: "utf-8",
+      input: opts.input,
       env: {
         ...process.env,
         ...env,
@@ -24,7 +25,63 @@ function runWithEnv(args, env = {}) {
   }
 }
 
+function setupSecurityEventsHome(lines) {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "clawkeeper-security-events-"));
+  const eventsDir = path.join(home, ".nemoclaw", "security");
+  fs.mkdirSync(eventsDir, { recursive: true });
+  const eventsPath = path.join(eventsDir, "events.jsonl");
+  fs.writeFileSync(eventsPath, `${lines.join("\n")}\n`, "utf-8");
+  return { home, eventsPath };
+}
+
 describe("security CLI commands", () => {
+  it("reports credential-store status for plaintext files", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "clawkeeper-security-status-"));
+    const credsDir = path.join(home, ".nemoclaw");
+    fs.mkdirSync(credsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(credsDir, "credentials.json"),
+      JSON.stringify({ NVIDIA_API_KEY: "nvapi-1", OPENAI_API_KEY: "sk-2" }, null, 2),
+      "utf-8",
+    );
+
+    const status = runWithEnv("security status", { HOME: home });
+    expect(status.code).toBe(0);
+    expect(status.out).toContain("Mode: plaintext");
+    expect(status.out).toContain("Credential keys: 2");
+    expect(status.out).toContain("NEMOCLAW_CRED_STORE_KEY: not detected");
+  });
+
+  it("encrypts credential store with security set-password and reports encrypted mode", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "clawkeeper-security-password-"));
+    const credsDir = path.join(home, ".nemoclaw");
+    fs.mkdirSync(credsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(credsDir, "credentials.json"),
+      JSON.stringify({ NVIDIA_API_KEY: "nvapi-1" }, null, 2),
+      "utf-8",
+    );
+
+    const set = runWithEnv("security set-password", {
+      HOME: home,
+      NEMOCLAW_CRED_STORE_KEY: "store-secret-1",
+    });
+    expect(set.code).toBe(0);
+    expect(set.out).toContain("Credential store encrypted (1 key)");
+
+    const encrypted = JSON.parse(
+      fs.readFileSync(path.join(credsDir, "credentials.json"), "utf-8"),
+    );
+    expect(encrypted.format).toBe("nemoclaw.credentials.v1");
+    expect(encrypted.encryption).toBe("aes-256-gcm");
+
+    const statusLocked = runWithEnv("security status", { HOME: home });
+    expect(statusLocked.code).toBe(0);
+    expect(statusLocked.out).toContain("Mode: encrypted");
+    expect(statusLocked.out).toContain("Credential keys: 1");
+    expect(statusLocked.out).toContain("NEMOCLAW_CRED_STORE_KEY: not detected");
+  });
+
   it("validates a well-formed security policy", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "clawkeeper-security-policy-"));
     const policyPath = path.join(tmp, "security-policy.yaml");
@@ -56,12 +113,53 @@ describe("security CLI commands", () => {
     expect(result.out).toContain("Security policy validation failed");
   });
 
-  it("prints events and replays a specific event", () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "clawkeeper-security-events-"));
-    const eventsDir = path.join(home, ".nemoclaw", "security");
-    fs.mkdirSync(eventsDir, { recursive: true });
-    const eventsPath = path.join(eventsDir, "events.jsonl");
+  it("supports combined filters and reports malformed JSONL lines", () => {
+    const eventLow = {
+      id: "evt-low",
+      timestamp: "2026-04-04T10:00:00.000Z",
+      hook: "before_tool_call",
+      action: "allow",
+      effectiveAction: "allow",
+      riskLevel: "low",
+      target: "ls -la",
+    };
+    const eventCriticalMatch = {
+      id: "evt-critical-match",
+      timestamp: "2026-04-04T11:00:00.000Z",
+      hook: "before_tool_call",
+      action: "block",
+      effectiveAction: "block",
+      riskLevel: "critical",
+      target: "rm -rf /",
+    };
+    const eventCriticalOtherHook = {
+      id: "evt-critical-other-hook",
+      timestamp: "2026-04-04T12:00:00.000Z",
+      hook: "after_tool_result",
+      action: "block",
+      effectiveAction: "block",
+      riskLevel: "critical",
+      target: "curl example.com",
+    };
+    const { home } = setupSecurityEventsHome([
+      JSON.stringify(eventLow),
+      "{invalid-jsonl",
+      JSON.stringify(eventCriticalMatch),
+      JSON.stringify(eventCriticalOtherHook),
+    ]);
 
+    const list = runWithEnv("security events --hook before_tool_call --risk critical --limit 10", {
+      HOME: home,
+    });
+    expect(list.code).toBe(0);
+    expect(list.out).toContain("Note: skipped 1 malformed event line(s).");
+    expect(list.out).toContain("Filters: hook=before_tool_call, risk=critical");
+    expect(list.out).toContain("evt-critical-match");
+    expect(list.out).not.toContain("evt-low");
+    expect(list.out).not.toContain("evt-critical-other-hook");
+  });
+
+  it("supports replay JSON output", () => {
     const event = {
       eventVersion: "security-event.v1",
       id: "evt-123",
@@ -75,17 +173,40 @@ describe("security CLI commands", () => {
       reason: "Matched critical command pattern",
       evidence: [{ code: "command_critical", message: "Matched critical pattern" }],
     };
+    const { home } = setupSecurityEventsHome([JSON.stringify(event)]);
 
-    fs.writeFileSync(eventsPath, `${JSON.stringify(event)}\n`, "utf-8");
-
-    const list = runWithEnv("security events --limit 1", { HOME: home });
-    expect(list.code).toBe(0);
-    expect(list.out).toContain("evt-123");
-    expect(list.out).toContain("before_tool_call");
-
-    const replay = runWithEnv("security replay evt-123", { HOME: home });
+    const replay = runWithEnv("security replay evt-123 --json", { HOME: home });
     expect(replay.code).toBe(0);
-    expect(replay.out).toContain("Event: evt-123");
-    expect(replay.out).toContain("Matched critical command pattern");
+    const payload = JSON.parse(replay.out);
+    expect(payload.event?.id).toBe("evt-123");
+    expect(payload.matches).toBe(1);
+  });
+
+  it("returns non-zero for ambiguous replay ID prefix (including JSON mode)", () => {
+    const event1 = {
+      id: "evt-prefix-a",
+      timestamp: "2026-04-04T12:00:00.000Z",
+      hook: "before_tool_call",
+      action: "block",
+      effectiveAction: "block",
+      riskLevel: "high",
+      target: "npm install foo",
+    };
+    const event2 = {
+      id: "evt-prefix-b",
+      timestamp: "2026-04-04T12:01:00.000Z",
+      hook: "before_tool_call",
+      action: "block",
+      effectiveAction: "block",
+      riskLevel: "high",
+      target: "npm install bar",
+    };
+    const { home } = setupSecurityEventsHome([JSON.stringify(event1), JSON.stringify(event2)]);
+
+    const replay = runWithEnv("security replay evt-prefix --json", { HOME: home });
+    expect(replay.code).toBe(1);
+    const payload = JSON.parse(replay.out);
+    expect(payload.event).toBeNull();
+    expect(payload.matches).toBe(2);
   });
 });

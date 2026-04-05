@@ -17,6 +17,10 @@ const BASE_POLICY_PATH = new URL(
   "../nemoclaw-blueprint/policies/openclaw-sandbox.yaml",
   import.meta.url,
 );
+const SECURITY_TEMPLATE_PATHS = [
+  "../nemoclaw-blueprint/policies/templates/security-dev-balanced.yaml",
+  "../nemoclaw-blueprint/policies/templates/security-ci-minimal.yaml",
+] as const;
 const REQUIRED_PROFILE_FIELDS = ["provider_type", "endpoint"] as const;
 
 const bp = YAML.parse(readFileSync(BLUEPRINT_PATH, "utf-8")) as Record<string, unknown>;
@@ -83,4 +87,23 @@ describe("base sandbox policy", () => {
   it("has 'network_policies'", () => {
     expect("network_policies" in policy).toBe(true);
   });
+});
+
+describe("security policy templates", () => {
+  for (const path of SECURITY_TEMPLATE_PATHS) {
+    const templatePath = new URL(path, import.meta.url);
+    const policy = YAML.parse(readFileSync(templatePath, "utf-8")) as Record<string, unknown>;
+
+    it(`${path} parses as a YAML mapping`, () => {
+      expect(policy).toEqual(expect.objectContaining({}));
+    });
+
+    it(`${path} has 'version'`, () => {
+      expect("version" in policy).toBe(true);
+    });
+
+    it(`${path} has 'network_policies'`, () => {
+      expect("network_policies" in policy).toBe(true);
+    });
+  }
 });

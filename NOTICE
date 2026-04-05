@@ -1,0 +1,5 @@
+ClawKeeper includes derivative work based in part on NVIDIA NemoClaw and is designed to operate with NVIDIA OpenShell and OpenClaw.
+
+This repository preserves upstream license and attribution notices in source files where applicable and adds ClawKeeper-specific modifications, documentation, and roadmap material.
+
+ClawKeeper is an independent derivative project. References to NVIDIA, NemoClaw, OpenShell, OpenClaw, or other third-party names are used to describe project origin, interoperability, or compatibility. All third-party marks remain the property of their respective owners.

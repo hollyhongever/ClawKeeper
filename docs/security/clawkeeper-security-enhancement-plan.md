@@ -128,6 +128,22 @@ If a release introduces unacceptable regressions, use phased rollback.
 Use this plan as the source of truth for implementation order.
 Each milestone should land in an independent PR to keep review scope and rollback boundaries clear.
 
+## Repository Positioning and Adjacent Roadmap
+
+This plan governs the first major ClawKeeper-native module: the Security Control Plane.
+ClawKeeper remains built on the NemoClaw and OpenShell foundation, and this document does not redefine that lower runtime boundary.
+
+The broader repository roadmap currently groups ClawKeeper-native work into the following tracks.
+
+| Track | Status | Relationship to this plan |
+|---|---|---|
+| Security Control Plane | Implemented and active | This document is the source of truth for its security interfaces, decisions, milestones, and rollout guidance. |
+| Runtime Watchdog | Planned | Reuses audit signals, runtime metadata, and policy outcomes to detect dead loops, token overconsumption, timeouts, stalled tasks, and abnormal unattended execution. |
+| Operator Intelligence | Planned | Will consume security and watchdog signals to recommend skills, workflows, and operator playbooks without replacing the underlying security boundary. |
+
+These future tracks are intentionally out of scope for the security acceptance criteria in this plan.
+However, security interfaces should remain reusable by those modules so ClawKeeper can grow without duplicating governance primitives.
+
 ## Execution Status Snapshot
 
 This section tracks implementation status for milestone execution and parallel coordination.
@@ -139,18 +155,21 @@ This section tracks implementation status for milestone execution and parallel c
 | M3 Malicious Skill Admission Control | Completed (v2 hardening) | Adds install target hardening for symlink escape detection, lifecycle-script detection, remote/insecure source handling, and structured scanner severity parsing with explicit fallback evidence. |
 | M4 Audit and Alert Closure | Completed (v2 hardening) | Adds filtered event browsing (`--action`, `--hook`, `--risk`, `--id`), malformed-line accounting, replay JSON mode, and prefix disambiguation with non-zero exit on ambiguity. |
 | M5 Sandbox Policy Complements | Completed (v2 hardening) | Adds `security-dev-balanced.yaml` and `security-ci-minimal.yaml` templates with docs and validation coverage for template parse/shape checks. |
-| M6-M10 Public Exposure Addendum | Planned | Password-first, encrypted credential store, unified redaction, staged dangerous-command policy, and rollout playbooks remain queued. |
+| M6-M10 Public Exposure Addendum | Completed (merged to `main`) | Password-first onboarding, encrypted credential storage, deterministic redaction, staged dangerous-command policy, and rollout playbooks have landed on the mainline repository. |
+| R1 Runtime Watchdog | Planned | Detect dead loops, token overconsumption, timeout or stalled-task conditions, retry storms, and operator-visible execution anomalies. |
+| R2 Operator Intelligence | Planned | Recommend skills, workflows, and operator playbooks using policy, audit, and runtime-health signals. |
 
-Current implementation branch baseline for parallel streams:
+Historical implementation branch baseline for the initial security rollout:
 
 - Base branch: `feature/security`
 - Parallel branches: `feature/security-main`, `feature/security-m2-hooks`, `feature/security-m3-install-gate`, `feature/security-m4-audit-cli`, `feature/security-m5-policy`, `feature/security-m6m8-exposure`, `feature/security-m9m10-rollout`
 - Worktrees are provisioned for each branch to avoid cross-stream file contention.
-- Integration status (2026-04-04): `feature/security-main` has integrated M2-M5 stream outputs and is the current baseline for M6-M10 development.
+- Historical note (2026-04-05): milestone streams were merged through `feature/security` and then promoted into `main`. The branch topology below is retained as a coordination record, not the current source-of-truth merge chain.
 
 ## Parallel Workstream Strategy
 
-This section defines how to execute milestone work in parallel without creating merge instability.
+This section records how the initial security rollout was executed in parallel without creating merge instability.
+Treat it as historical implementation guidance for the completed security stream.
 
 ### Interface Freeze Before Parallel Build
 

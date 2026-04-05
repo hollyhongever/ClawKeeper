@@ -34,7 +34,8 @@
     "nemoclaw-blueprint/",
     "scripts/",
     "Dockerfile",
-    ".dockerignore"
+    ".dockerignore",
+    "NOTICE"
   ],
   "engines": {
     "node": ">=22.16.0"

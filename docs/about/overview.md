@@ -28,6 +28,16 @@ It builds on the NemoClaw and OpenShell foundation, then adds ClawKeeper-specifi
 ClawKeeper keeps the upstream sandbox, routing, onboarding, and blueprint lifecycle model.
 Its main differentiation is the security module implemented in this repository and documented under the `docs/security/` section.
 
+## Project Positioning
+
+ClawKeeper should be understood as a layered project rather than a pure rebrand.
+
+| Layer | Role |
+|---|---|
+| Upstream foundation | NemoClaw and OpenShell provide the sandbox, routing, onboarding, and blueprint lifecycle model. |
+| Current ClawKeeper extension | The Security Control Plane adds semantic interception, install admission, audit visibility, redaction, credential hardening, and rollout controls. |
+| Planned ClawKeeper extensions | Runtime Watchdog and Operator Intelligence modules will add long-running task governance and proactive operator guidance. |
+
 | Capability              | Description                                                                                                                                          |
 |-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Sandbox OpenClaw        | Creates an OpenShell sandbox pre-configured for OpenClaw, with filesystem and network policies applied from the first boot.                         |
@@ -47,6 +57,8 @@ ClawKeeper provides the following capabilities on top of the upstream runtime fo
 | Install admission control | Uses `before_install` to scan third-party skills and gate suspicious packages before they land in the environment. |
 | Audit and replay workflows | Records `security-event.v1` JSONL output and provides CLI tools for policy validation, event browsing, and replay analysis. |
 | Credential and exposure hardening | Adds password-first onboarding, encrypted credential storage, deterministic redaction, and public-exposure rollout guidance. |
+| Runtime watchdogs (planned) | Will detect dead loops, abnormal token burn, timeout or stalled-task conditions, and repeated failure patterns. |
+| Operator intelligence (planned) | Will recommend skills, workflows, and operator playbooks based on deployment posture, audit history, and runtime health. |
 | State management | Safe migration of agent state across machines with credential stripping and integrity verification. |
 | Messaging bridges | Host-side processes that connect Telegram, Discord, and Slack to the sandboxed agent. |
 | Routed inference | Provider-routed model calls through the OpenShell gateway, transparent to the agent. Supports NVIDIA Endpoints, OpenAI, Anthropic, Google Gemini, and local Ollama. |
@@ -93,3 +105,5 @@ Explore the following pages to learn more about ClawKeeper.
 - [Approve or Deny Network Requests](../network-policy/approve-network-requests.md) to manage egress approvals.
 - [Deploy to a Remote GPU Instance](../deployment/deploy-to-remote-gpu.md) for persistent operation.
 - [Monitor Sandbox Activity](../monitoring/monitor-sandbox-activity.md) to observe agent behavior.
+
+At the repository level, `UPSTREAM.md` explains the relationship to NemoClaw and OpenShell, while `ROADMAP.md` tracks planned Runtime Watchdog and Operator Intelligence layers.

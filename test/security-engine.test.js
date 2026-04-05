@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -69,6 +69,76 @@ describe("security engine", () => {
     const decision = await engine.evaluateBeforeToolCall({ command: "echo four > /sandbox/d.txt" });
     expect(decision.riskLevel).toBe("high");
     expect(decision.action).toBe("require_approval");
+  });
+
+  it("flags install lifecycle scripts as high risk", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "clawkeeper-skill-lifecycle-"));
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify(
+        {
+          name: "demo-skill",
+          scripts: {
+            postinstall: "node scripts/setup.js",
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const engine = new SecurityEngine(DEFAULT_SECURITY_POLICY, config);
+    const decision = await engine.evaluateBeforeInstall({ target: dir });
+    expect(decision.riskLevel).toBe("high");
+    expect(decision.evidence.some((item) => item.code === "install_lifecycle_scripts")).toBe(true);
+  });
+
+  it("flags insecure HTTP install sources", async () => {
+    const engine = new SecurityEngine(DEFAULT_SECURITY_POLICY, config);
+    const decision = await engine.evaluateBeforeInstall({
+      target: "http://evil.example.com/skill.tgz",
+    });
+    expect(decision.riskLevel).toBe("high");
+    expect(decision.evidence.some((item) => item.code === "install_insecure_transport")).toBe(true);
+  });
+
+  it("flags scanner unavailability when scanner is configured but missing", async () => {
+    const policy = {
+      ...DEFAULT_SECURITY_POLICY,
+      installRules: {
+        ...DEFAULT_SECURITY_POLICY.installRules,
+        scannerCommand: "__definitely_missing_scanner__",
+        scannerArgs: [],
+      },
+    };
+    const engine = new SecurityEngine(policy, {
+      ...config,
+      scanTimeoutMs: 1000,
+    });
+
+    const decision = await engine.evaluateBeforeInstall({
+      target: "/sandbox/skill",
+    });
+    expect(decision.riskLevel).toBe("high");
+    expect(
+      decision.evidence.some(
+        (item) => item.code === "scanner_unavailable" || item.code === "scanner_nonzero_exit",
+      ),
+    ).toBe(true);
+  });
+
+  it("flags symlink escape in local install targets", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "clawkeeper-skill-symlink-"));
+    const safeDir = join(dir, "skill");
+    mkdirSync(safeDir, { recursive: true });
+    const outside = mkdtempSync(join(tmpdir(), "clawkeeper-outside-"));
+    symlinkSync(outside, join(safeDir, "outside-link"));
+
+    const engine = new SecurityEngine(DEFAULT_SECURITY_POLICY, config);
+    const decision = await engine.evaluateBeforeInstall({ target: safeDir });
+    expect(decision.riskLevel).toBe("critical");
+    expect(decision.evidence.some((item) => item.code === "install_symlink_escape")).toBe(true);
   });
 });
 

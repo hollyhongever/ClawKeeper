@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { execa } from "execa";
@@ -278,6 +278,120 @@ function walkFiles(basePath: string, maxFiles: number): string[] {
   return files;
 }
 
+function safeRealPath(target: string): string {
+  try {
+    return realpathSync(target);
+  } catch {
+    return target;
+  }
+}
+
+function inspectLocalInstallTarget(
+  target: string,
+  evidence: SecurityEvidence[],
+): SecurityRiskLevel {
+  if (!target || !existsSync(target)) return "low";
+
+  const rootRealPath = safeRealPath(target);
+  const queue: string[] = [target];
+  let level: SecurityRiskLevel = "low";
+  let inspectedEntries = 0;
+
+  while (queue.length > 0 && inspectedEntries < 200) {
+    const current = queue.shift();
+    if (!current) break;
+
+    let stat;
+    try {
+      stat = lstatSync(current);
+    } catch {
+      continue;
+    }
+    inspectedEntries += 1;
+
+    if (stat.isSymbolicLink()) {
+      const currentRealPath = safeRealPath(current);
+      if (!currentRealPath.startsWith(rootRealPath)) {
+        level = higherRisk(level, "critical");
+        evidence.push({
+          code: "install_symlink_escape",
+          message: `Install target contains symlink escaping root: ${current}`,
+          metadata: { resolvedPath: currentRealPath },
+        });
+      } else {
+        level = higherRisk(level, "medium");
+        evidence.push({
+          code: "install_symlink_present",
+          message: `Install target contains symlink: ${current}`,
+        });
+      }
+      continue;
+    }
+
+    if (stat.isDirectory()) {
+      try {
+        const entries = readdirSync(current).slice(0, 200);
+        for (const entry of entries) {
+          queue.push(join(current, entry));
+        }
+      } catch {
+        // ignored
+      }
+      continue;
+    }
+
+    if (!stat.isFile()) continue;
+
+    if (current.toLowerCase().endsWith("package.json")) {
+      try {
+        const parsed = JSON.parse(readFileSync(current, "utf-8")) as Record<string, unknown>;
+        const scripts =
+          parsed["scripts"] &&
+          typeof parsed["scripts"] === "object" &&
+          !Array.isArray(parsed["scripts"])
+            ? (parsed["scripts"] as Record<string, unknown>)
+            : {};
+        const lifecycleHooks = ["preinstall", "install", "postinstall"];
+        const presentHooks = lifecycleHooks.filter((hook) => {
+          const scriptValue = scripts[hook];
+          return typeof scriptValue === "string" && scriptValue.trim().length > 0;
+        });
+        if (presentHooks.length > 0) {
+          level = higherRisk(level, "high");
+          evidence.push({
+            code: "install_lifecycle_scripts",
+            message: `Lifecycle install scripts detected in ${current}`,
+            metadata: { hooks: presentHooks },
+          });
+        }
+      } catch {
+        // ignored
+      }
+    }
+  }
+
+  return level;
+}
+
+function parseScannerSeverity(output: string): SecurityRiskLevel | null {
+  const normalized = output.toLowerCase();
+  if (/\bcritical\b/.test(normalized)) return "critical";
+  if (/\bhigh\b/.test(normalized)) return "high";
+  if (/\bmedium\b/.test(normalized)) return "medium";
+  if (/\blow\b/.test(normalized)) return "low";
+
+  // Structured output support, e.g. {"severity":"high"} or "severity=critical".
+  const jsonLike = /"severity"\s*:\s*"(critical|high|medium|low)"/.exec(normalized);
+  if (jsonLike) return jsonLike[1] as SecurityRiskLevel;
+  const kvLike = /\bseverity\s*=\s*(critical|high|medium|low)\b/.exec(normalized);
+  if (kvLike) return kvLike[1] as SecurityRiskLevel;
+  return null;
+}
+
+function targetLooksLikeUrl(target: string): boolean {
+  return /^https?:\/\//i.test(target.trim());
+}
+
 function readScanTextFromTarget(target: string): string {
   if (!target || !existsSync(target)) return "";
   const files = walkFiles(target, 30);
@@ -430,6 +544,14 @@ export class SecurityEngine {
     const evidence: SecurityEvidence[] = [];
     let risk: SecurityRiskLevel = "low";
 
+    if (!context.target.trim()) {
+      risk = higherRisk(risk, "high");
+      evidence.push({
+        code: "install_target_missing",
+        message: "Install request has no explicit target path or source",
+      });
+    }
+
     if (context.target.includes("..")) {
       risk = "critical";
       evidence.push({
@@ -437,6 +559,27 @@ export class SecurityEngine {
         message: `Path traversal-like install target: ${context.target}`,
       });
     }
+
+    if (targetLooksLikeUrl(context.target)) {
+      const urlScheme = context.target.slice(0, context.target.indexOf("://"));
+      if (urlScheme.toLowerCase() === "http") {
+        risk = higherRisk(risk, "high");
+        evidence.push({
+          code: "install_insecure_transport",
+          message: `Install target uses insecure transport: ${context.target}`,
+        });
+      } else {
+        risk = higherRisk(risk, "medium");
+        evidence.push({
+          code: "install_remote_source",
+          message: `Install target uses remote source: ${context.target}`,
+        });
+      }
+    }
+
+    risk = higherRisk(risk, findRiskByPath(context.paths, this.policy, evidence));
+    risk = higherRisk(risk, findRiskByHosts(context.hosts, this.policy, evidence));
+    risk = higherRisk(risk, inspectLocalInstallTarget(context.target, evidence));
 
     const localScanText = context.target ? readScanTextFromTarget(context.target) : "";
     const scanText = `${context.text}\n${localScanText}`;
@@ -473,40 +616,57 @@ export class SecurityEngine {
           stdout: "pipe",
           stderr: "pipe",
         });
-        const output = `${result.stdout}\n${result.stderr}`.toLowerCase();
+        const output = `${result.stdout}\n${result.stderr}`.slice(0, 20000);
+        const severity = parseScannerSeverity(output);
 
-        if (output.includes("critical")) {
+        if (severity === "critical") {
           risk = higherRisk(risk, "critical");
           evidence.push({
             code: "scanner_critical",
             message: "External scanner reported critical risk",
+            metadata: { exitCode: result.exitCode },
           });
-        } else if (output.includes("high") || result.exitCode !== 0) {
+        } else if (severity === "high") {
           risk = higherRisk(risk, "high");
           evidence.push({
             code: "scanner_high",
-            message: "External scanner reported high risk or non-zero exit",
+            message: "External scanner reported high risk",
             metadata: { exitCode: result.exitCode },
           });
-        } else if (output.includes("medium")) {
+        } else if (severity === "medium") {
           risk = higherRisk(risk, "medium");
           evidence.push({
             code: "scanner_medium",
             message: "External scanner reported medium risk",
+            metadata: { exitCode: result.exitCode },
+          });
+        } else if (result.exitCode !== 0) {
+          risk = higherRisk(risk, "high");
+          evidence.push({
+            code: "scanner_nonzero_exit",
+            message: "External scanner returned non-zero exit without structured severity",
+            metadata: { exitCode: result.exitCode },
           });
         } else {
           evidence.push({
             code: "scanner_clean",
             message: "External scanner did not report elevated risk",
+            metadata: { exitCode: result.exitCode },
           });
         }
-      } catch {
+      } catch (error) {
         risk = higherRisk(risk, "high");
         evidence.push({
-          code: "scanner_timeout",
+          code: "scanner_unavailable",
           message: `External scanner failed or timed out (> ${String(this.config.scanTimeoutMs)} ms)`,
+          metadata: { error: String(error) },
         });
       }
+    } else {
+      evidence.push({
+        code: "scanner_not_configured",
+        message: "External scanner command is not configured; relying on local pattern analysis",
+      });
     }
 
     if (evidence.length === 0) {

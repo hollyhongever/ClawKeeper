@@ -44,6 +44,28 @@ describe("security engine", () => {
     expect(decision.action).toBe("require_approval");
   });
 
+  it("requires approval for privilege escalation commands", async () => {
+    const engine = new SecurityEngine(DEFAULT_SECURITY_POLICY, config);
+    const decision = await engine.evaluateBeforeToolCall({
+      toolName: "shell",
+      command: "sudo cat /tmp/notes.txt",
+    });
+    expect(decision.riskLevel).toBe("high");
+    expect(decision.action).toBe("require_approval");
+    expect(decision.evidence.some((item) => item.code === "command_privilege_escalation")).toBe(true);
+  });
+
+  it("requires approval for dynamic shell substitution", async () => {
+    const engine = new SecurityEngine(DEFAULT_SECURITY_POLICY, config);
+    const decision = await engine.evaluateBeforeToolCall({
+      toolName: "shell",
+      command: "echo $(cat /tmp/a.txt)",
+    });
+    expect(decision.riskLevel).toBe("high");
+    expect(decision.action).toBe("require_approval");
+    expect(decision.evidence.some((item) => item.code === "command_dynamic_substitution")).toBe(true);
+  });
+
   it("allows low-risk commands", async () => {
     const engine = new SecurityEngine(DEFAULT_SECURITY_POLICY, config);
     const decision = await engine.evaluateBeforeToolCall({

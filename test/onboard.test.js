@@ -36,6 +36,18 @@ import {
 import { buildWebSearchDockerConfig } from "../dist/lib/web-search";
 
 describe("onboard helpers", () => {
+  it("uses password-first guidance and avoids tokenized Control UI URL instructions", () => {
+    const source = fs.readFileSync(
+      path.join(import.meta.dirname, "..", "bin", "lib", "onboard.js"),
+      "utf-8",
+    );
+
+    expect(source).toContain("NEMOCLAW_CRED_STORE_KEY");
+    expect(source).toContain("clawkeeper security set-password");
+    expect(source).not.toContain("tokenized URL");
+    expect(source).not.toContain("#token=<token>");
+  });
+
   it("classifies sandbox create timeout failures and tracks upload progress", () => {
     expect(
       classifySandboxCreateFailure("Error: failed to read image export stream\nTimeout error").kind,

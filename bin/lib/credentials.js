@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
@@ -8,6 +9,38 @@ const readline = require("readline");
 const { execFileSync } = require("child_process");
 
 const UNSAFE_HOME_PATHS = new Set(["/tmp", "/var/tmp", "/dev/shm", "/"]);
+const CRED_STORE_KEY_ENV = "NEMOCLAW_CRED_STORE_KEY";
+
+const CRED_ENVELOPE_FORMAT = "nemoclaw.credentials.v1";
+const CRED_ENVELOPE_VERSION = 1;
+const CRED_ENCRYPTION = "aes-256-gcm";
+const CRED_KDF_NAME = "scrypt";
+const CRED_SCRYPT_N = 16384;
+const CRED_SCRYPT_R = 8;
+const CRED_SCRYPT_P = 1;
+const CRED_SCRYPT_KEYLEN = 32;
+const CRED_SCRYPT_MAXMEM = 128 * 1024 * 1024;
+const CRED_SALT_BYTES = 16;
+const CRED_IV_BYTES = 12;
+
+let _credsDir = null;
+let _credsFile = null;
+let _warnedMissingStoreKey = false;
+
+function credentialStoreError(message, code) {
+  const err = new Error(message);
+  err.code = code;
+  return err;
+}
+
+function normalizeCredentialStoreKey(value) {
+  if (typeof value !== "string") return "";
+  return value.replace(/\r/g, "").replace(/\n/g, "");
+}
+
+function getCredentialStoreKeyFromEnv() {
+  return normalizeCredentialStoreKey(process.env[CRED_STORE_KEY_ENV] || "");
+}
 
 function resolveHomeDir() {
   const raw = process.env.HOME || os.homedir();
@@ -42,9 +75,6 @@ function resolveHomeDir() {
   return home;
 }
 
-let _credsDir = null;
-let _credsFile = null;
-
 function getCredsDir() {
   if (!_credsDir) _credsDir = path.join(resolveHomeDir(), ".nemoclaw");
   return _credsDir;
@@ -55,16 +85,18 @@ function getCredsFile() {
   return _credsFile;
 }
 
-function loadCredentials() {
-  try {
-    const file = getCredsFile();
-    if (fs.existsSync(file)) {
-      return JSON.parse(fs.readFileSync(file, "utf-8"));
-    }
-  } catch {
-    /* ignored */
-  }
-  return {};
+function isPlainObject(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function isEncryptedEnvelope(payload) {
+  if (!isPlainObject(payload)) return false;
+  if (payload.format !== CRED_ENVELOPE_FORMAT) return false;
+  if (payload.encryption !== CRED_ENCRYPTION) return false;
+  if (!isPlainObject(payload.kdf)) return false;
+  if (payload.kdf.name !== CRED_KDF_NAME) return false;
+  if (!isPlainObject(payload.cipher)) return false;
+  return typeof payload.ciphertext === "string";
 }
 
 function normalizeCredentialValue(value) {
@@ -72,22 +104,308 @@ function normalizeCredentialValue(value) {
   return value.replace(/\r/g, "").trim();
 }
 
-function saveCredential(key, value) {
+function normalizeCredentialMap(raw) {
+  if (!isPlainObject(raw)) return {};
+  const normalized = {};
+  for (const [key, value] of Object.entries(raw)) {
+    normalized[String(key)] = normalizeCredentialValue(value);
+  }
+  return normalized;
+}
+
+function deriveStoreKey(password, saltB64, kdf = {}) {
+  const salt = Buffer.from(String(saltB64 || ""), "base64");
+  if (salt.length === 0) {
+    throw credentialStoreError("Credential store metadata is invalid (missing salt).", "CREDENTIAL_STORE_INVALID");
+  }
+  const N = Number.parseInt(kdf.N, 10) || CRED_SCRYPT_N;
+  const r = Number.parseInt(kdf.r, 10) || CRED_SCRYPT_R;
+  const p = Number.parseInt(kdf.p, 10) || CRED_SCRYPT_P;
+  return crypto.scryptSync(password, salt, CRED_SCRYPT_KEYLEN, {
+    N,
+    r,
+    p,
+    maxmem: CRED_SCRYPT_MAXMEM,
+  });
+}
+
+function encryptCredentialMap(credentials, password) {
+  const normalized = normalizeCredentialMap(credentials);
+  const salt = crypto.randomBytes(CRED_SALT_BYTES);
+  const iv = crypto.randomBytes(CRED_IV_BYTES);
+  const key = crypto.scryptSync(password, salt, CRED_SCRYPT_KEYLEN, {
+    N: CRED_SCRYPT_N,
+    r: CRED_SCRYPT_R,
+    p: CRED_SCRYPT_P,
+    maxmem: CRED_SCRYPT_MAXMEM,
+  });
+
+  const cipher = crypto.createCipheriv(CRED_ENCRYPTION, key, iv);
+  const plaintext = Buffer.from(JSON.stringify(normalized), "utf8");
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+
+  return {
+    format: CRED_ENVELOPE_FORMAT,
+    version: CRED_ENVELOPE_VERSION,
+    encryption: CRED_ENCRYPTION,
+    credentialCount: Object.keys(normalized).length,
+    kdf: {
+      name: CRED_KDF_NAME,
+      N: CRED_SCRYPT_N,
+      r: CRED_SCRYPT_R,
+      p: CRED_SCRYPT_P,
+      salt: salt.toString("base64"),
+    },
+    cipher: {
+      iv: iv.toString("base64"),
+      tag: tag.toString("base64"),
+    },
+    ciphertext: ciphertext.toString("base64"),
+  };
+}
+
+function decryptCredentialEnvelope(payload, password) {
+  if (!password) {
+    throw credentialStoreError(
+      `Credential store is encrypted. Set ${CRED_STORE_KEY_ENV} or run 'clawkeeper security set-password'.`,
+      "CREDENTIAL_STORE_KEY_REQUIRED",
+    );
+  }
+  try {
+    const key = deriveStoreKey(password, payload.kdf?.salt, payload.kdf);
+    const iv = Buffer.from(String(payload.cipher?.iv || ""), "base64");
+    const tag = Buffer.from(String(payload.cipher?.tag || ""), "base64");
+    const ciphertext = Buffer.from(String(payload.ciphertext || ""), "base64");
+    if (iv.length === 0 || tag.length === 0 || ciphertext.length === 0) {
+      throw credentialStoreError(
+        "Credential store metadata is invalid (cipher payload missing).",
+        "CREDENTIAL_STORE_INVALID",
+      );
+    }
+    const decipher = crypto.createDecipheriv(CRED_ENCRYPTION, key, iv);
+    decipher.setAuthTag(tag);
+    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    const parsed = JSON.parse(decrypted.toString("utf8"));
+    return normalizeCredentialMap(parsed);
+  } catch (error) {
+    if (error && error.code === "CREDENTIAL_STORE_INVALID") {
+      throw error;
+    }
+    throw credentialStoreError(
+      `Credential store decryption failed. Check ${CRED_STORE_KEY_ENV} or rotate with 'clawkeeper security set-password'.`,
+      "CREDENTIAL_STORE_DECRYPT_FAILED",
+    );
+  }
+}
+
+function parseCredentialStoreFile() {
+  const file = getCredsFile();
+  if (!fs.existsSync(file)) {
+    return {
+      exists: false,
+      mode: "plaintext",
+      credentials: {},
+      payload: null,
+      malformed: false,
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(file, "utf-8"));
+    if (isEncryptedEnvelope(parsed)) {
+      return {
+        exists: true,
+        mode: "encrypted",
+        credentials: null,
+        payload: parsed,
+        malformed: false,
+      };
+    }
+    if (isPlainObject(parsed)) {
+      return {
+        exists: true,
+        mode: "plaintext",
+        credentials: normalizeCredentialMap(parsed),
+        payload: parsed,
+        malformed: false,
+      };
+    }
+  } catch {
+    // Keep backwards-compatible behavior for malformed files: treat as empty.
+  }
+
+  return {
+    exists: true,
+    mode: "plaintext",
+    credentials: {},
+    payload: null,
+    malformed: true,
+  };
+}
+
+function writeCredentialStorePayload(payload) {
   const dir = getCredsDir();
   const file = getCredsFile();
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   fs.chmodSync(dir, 0o700);
-  const creds = loadCredentials();
-  creds[key] = normalizeCredentialValue(value);
-  fs.writeFileSync(file, JSON.stringify(creds, null, 2), { mode: 0o600 });
+  fs.writeFileSync(file, JSON.stringify(payload, null, 2), { mode: 0o600 });
   fs.chmodSync(file, 0o600);
+}
+
+function loadCredentialStore(opts = {}) {
+  const { password = "", migratePlaintext = true } = opts;
+  const parsed = parseCredentialStoreFile();
+  const envPassword = getCredentialStoreKeyFromEnv();
+
+  if (parsed.mode === "encrypted") {
+    const secret = normalizeCredentialStoreKey(password) || envPassword;
+    const credentials = decryptCredentialEnvelope(parsed.payload, secret);
+    return { mode: "encrypted", credentials, migrated: false, encryptedPayload: parsed.payload };
+  }
+
+  const credentials = parsed.credentials || {};
+  if (!migratePlaintext) {
+    return { mode: "plaintext", credentials, migrated: false, encryptedPayload: null };
+  }
+
+  if (envPassword) {
+    const envelope = encryptCredentialMap(credentials, envPassword);
+    writeCredentialStorePayload(envelope);
+    return { mode: "encrypted", credentials, migrated: true, encryptedPayload: envelope };
+  }
+
+  return { mode: "plaintext", credentials, migrated: false, encryptedPayload: null };
+}
+
+function writeCredentialMap(credentials, opts = {}) {
+  const forceEncrypted = opts.forceEncrypted === true;
+  const password = normalizeCredentialStoreKey(opts.password || "") || getCredentialStoreKeyFromEnv();
+  const payload = normalizeCredentialMap(credentials);
+  if (forceEncrypted || password) {
+    if (!password) {
+      throw credentialStoreError(
+        `Credential store is encrypted. Set ${CRED_STORE_KEY_ENV} or run 'clawkeeper security set-password'.`,
+        "CREDENTIAL_STORE_KEY_REQUIRED",
+      );
+    }
+    writeCredentialStorePayload(encryptCredentialMap(payload, password));
+    return "encrypted";
+  }
+  writeCredentialStorePayload(payload);
+  return "plaintext";
+}
+
+function reportCredentialStoreAccessWarning(error) {
+  if (!error || _warnedMissingStoreKey) return;
+  if (
+    error.code === "CREDENTIAL_STORE_KEY_REQUIRED" ||
+    error.code === "CREDENTIAL_STORE_DECRYPT_FAILED" ||
+    error.code === "CREDENTIAL_STORE_INVALID"
+  ) {
+    _warnedMissingStoreKey = true;
+    console.error(`  ${error.message}`);
+  }
+}
+
+function loadCredentials() {
+  try {
+    return loadCredentialStore({ migratePlaintext: true }).credentials;
+  } catch (error) {
+    if (
+      error &&
+      (error.code === "CREDENTIAL_STORE_KEY_REQUIRED" ||
+        error.code === "CREDENTIAL_STORE_DECRYPT_FAILED" ||
+        error.code === "CREDENTIAL_STORE_INVALID")
+    ) {
+      throw error;
+    }
+    return {};
+  }
+}
+
+function saveCredential(key, value) {
+  const parsed = parseCredentialStoreFile();
+  const store = loadCredentialStore({ migratePlaintext: true });
+  const creds = { ...store.credentials };
+  creds[key] = normalizeCredentialValue(value);
+
+  const shouldEncrypt = parsed.mode === "encrypted" || store.mode === "encrypted";
+  writeCredentialMap(creds, { forceEncrypted: shouldEncrypt });
 }
 
 function getCredential(key) {
   if (process.env[key]) return normalizeCredentialValue(process.env[key]);
-  const creds = loadCredentials();
-  const value = normalizeCredentialValue(creds[key]);
-  return value || null;
+
+  try {
+    const creds = loadCredentials();
+    const value = normalizeCredentialValue(creds[key]);
+    return value || null;
+  } catch (error) {
+    reportCredentialStoreAccessWarning(error);
+    return null;
+  }
+}
+
+function getCredentialStoreStatus() {
+  const parsed = parseCredentialStoreFile();
+  const envPassword = getCredentialStoreKeyFromEnv();
+
+  if (parsed.mode === "encrypted") {
+    let credentialCount = Number.parseInt(parsed.payload?.credentialCount, 10);
+    if (!Number.isFinite(credentialCount) || credentialCount < 0) credentialCount = 0;
+
+    if (envPassword) {
+      try {
+        credentialCount = Object.keys(decryptCredentialEnvelope(parsed.payload, envPassword)).length;
+      } catch {
+        // Keep envelope metadata count when decryption fails.
+      }
+    }
+
+    return {
+      mode: "encrypted",
+      credentialCount,
+      passwordEnvDetected: Boolean(envPassword),
+      path: getCredsFile(),
+    };
+  }
+
+  return {
+    mode: "plaintext",
+    credentialCount: Object.keys(parsed.credentials || {}).length,
+    passwordEnvDetected: Boolean(envPassword),
+    path: getCredsFile(),
+  };
+}
+
+function setCredentialStorePassword(nextPassword, opts = {}) {
+  const newPassword = normalizeCredentialStoreKey(nextPassword || "");
+  if (!newPassword) {
+    throw credentialStoreError("Credential-store password cannot be empty.", "CREDENTIAL_STORE_PASSWORD_REQUIRED");
+  }
+
+  const parsed = parseCredentialStoreFile();
+  let credentials = {};
+  let previousMode = "plaintext";
+
+  if (parsed.mode === "encrypted") {
+    previousMode = "encrypted";
+    const currentPassword =
+      normalizeCredentialStoreKey(opts.currentPassword || "") || getCredentialStoreKeyFromEnv();
+    credentials = decryptCredentialEnvelope(parsed.payload, currentPassword);
+  } else {
+    credentials = normalizeCredentialMap(parsed.credentials || {});
+  }
+
+  writeCredentialMap(credentials, { forceEncrypted: true, password: newPassword });
+
+  return {
+    previousMode,
+    mode: "encrypted",
+    credentialCount: Object.keys(credentials).length,
+    path: getCredsFile(),
+  };
 }
 
 function promptSecret(question) {
@@ -251,7 +569,7 @@ async function ensureApiKey() {
   saveCredential("NVIDIA_API_KEY", key);
   process.env.NVIDIA_API_KEY = key;
   console.log("");
-  console.log("  Key saved to ~/.nemoclaw/credentials.json (mode 600)");
+  console.log("  Credential saved to ~/.nemoclaw/credentials.json");
   console.log("");
 }
 
@@ -306,7 +624,7 @@ async function ensureGithubToken() {
   saveCredential("GITHUB_TOKEN", token);
   process.env.GITHUB_TOKEN = token;
   console.log("");
-  console.log("  Token saved to ~/.nemoclaw/credentials.json (mode 600)");
+  console.log("  Credential saved to ~/.nemoclaw/credentials.json");
   console.log("");
 }
 
@@ -315,10 +633,14 @@ const exports_ = {
   normalizeCredentialValue,
   saveCredential,
   getCredential,
+  getCredentialStoreStatus,
+  setCredentialStorePassword,
+  getCredentialStoreKeyFromEnv,
   prompt,
   ensureApiKey,
   ensureGithubToken,
   isRepoPrivate,
+  CRED_STORE_KEY_ENV,
 };
 
 Object.defineProperty(exports_, "CREDS_DIR", { get: getCredsDir, enumerable: true });

@@ -9,10 +9,11 @@ import { describe, expect, it } from "vitest";
 
 const CLI = path.join(import.meta.dirname, "..", "bin", "nemoclaw.js");
 
-function runWithEnv(args, env = {}) {
+function runWithEnv(args, env = {}, opts = {}) {
   try {
     const out = execSync(`node "${CLI}" ${args}`, {
       encoding: "utf-8",
+      input: opts.input,
       env: {
         ...process.env,
         ...env,
@@ -34,6 +35,53 @@ function setupSecurityEventsHome(lines) {
 }
 
 describe("security CLI commands", () => {
+  it("reports credential-store status for plaintext files", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "clawkeeper-security-status-"));
+    const credsDir = path.join(home, ".nemoclaw");
+    fs.mkdirSync(credsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(credsDir, "credentials.json"),
+      JSON.stringify({ NVIDIA_API_KEY: "nvapi-1", OPENAI_API_KEY: "sk-2" }, null, 2),
+      "utf-8",
+    );
+
+    const status = runWithEnv("security status", { HOME: home });
+    expect(status.code).toBe(0);
+    expect(status.out).toContain("Mode: plaintext");
+    expect(status.out).toContain("Credential keys: 2");
+    expect(status.out).toContain("NEMOCLAW_CRED_STORE_KEY: not detected");
+  });
+
+  it("encrypts credential store with security set-password and reports encrypted mode", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "clawkeeper-security-password-"));
+    const credsDir = path.join(home, ".nemoclaw");
+    fs.mkdirSync(credsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(credsDir, "credentials.json"),
+      JSON.stringify({ NVIDIA_API_KEY: "nvapi-1" }, null, 2),
+      "utf-8",
+    );
+
+    const set = runWithEnv("security set-password", {
+      HOME: home,
+      NEMOCLAW_CRED_STORE_KEY: "store-secret-1",
+    });
+    expect(set.code).toBe(0);
+    expect(set.out).toContain("Credential store encrypted (1 key)");
+
+    const encrypted = JSON.parse(
+      fs.readFileSync(path.join(credsDir, "credentials.json"), "utf-8"),
+    );
+    expect(encrypted.format).toBe("nemoclaw.credentials.v1");
+    expect(encrypted.encryption).toBe("aes-256-gcm");
+
+    const statusLocked = runWithEnv("security status", { HOME: home });
+    expect(statusLocked.code).toBe(0);
+    expect(statusLocked.out).toContain("Mode: encrypted");
+    expect(statusLocked.out).toContain("Credential keys: 1");
+    expect(statusLocked.out).toContain("NEMOCLAW_CRED_STORE_KEY: not detected");
+  });
+
   it("validates a well-formed security policy", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "clawkeeper-security-policy-"));
     const policyPath = path.join(tmp, "security-policy.yaml");

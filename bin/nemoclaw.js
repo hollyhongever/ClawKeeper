@@ -36,6 +36,11 @@ const {
   ensureApiKey,
   ensureGithubToken,
   getCredential,
+  getCredentialStoreStatus,
+  setCredentialStorePassword,
+  getCredentialStoreKeyFromEnv,
+  CRED_STORE_KEY_ENV,
+  prompt: credentialPrompt,
   isRepoPrivate,
 } = require("./lib/credentials");
 const registry = require("./lib/registry");
@@ -1399,12 +1404,82 @@ function optionValue(args, flag, fallback = "") {
 function securityHelp() {
   console.log("");
   console.log("  Security commands:");
+  console.log(`    ${preferredCmd("security status")}`);
+  console.log(`    ${preferredCmd("security set-password")}`);
   console.log(`    ${preferredCmd("security policy validate [--file PATH]")}`);
   console.log(
     `    ${preferredCmd("security events [--limit N] [--action A] [--hook H] [--risk R] [--id PATTERN] [--json] [--file PATH]")}`,
   );
   console.log(`    ${preferredCmd("security replay <event-id> [--json] [--file PATH]")}`);
   console.log("");
+}
+
+function handleSecurityStatus() {
+  const status = getCredentialStoreStatus();
+  console.log("  Credential store status:");
+  console.log(`  Mode: ${status.mode}`);
+  console.log(`  Credential keys: ${status.credentialCount}`);
+  console.log(
+    `  ${CRED_STORE_KEY_ENV}: ${status.passwordEnvDetected ? "detected" : "not detected"}`,
+  );
+}
+
+async function handleSecuritySetPassword() {
+  const status = getCredentialStoreStatus();
+  const envPassword = getCredentialStoreKeyFromEnv();
+  const interactive = process.stdin.isTTY && process.stderr.isTTY;
+  let currentPassword = envPassword;
+  let nextPassword = "";
+
+  if (interactive) {
+    if (status.mode === "encrypted" && !currentPassword) {
+      currentPassword = await credentialPrompt("  Current credential-store password: ", {
+        secret: true,
+      });
+    }
+    if (envPassword) {
+      const typed = await credentialPrompt(
+        `  New credential-store password (leave blank to reuse ${CRED_STORE_KEY_ENV}): `,
+        { secret: true },
+      );
+      nextPassword = typed || envPassword;
+    } else {
+      const first = await credentialPrompt("  New credential-store password: ", { secret: true });
+      const second = await credentialPrompt("  Confirm credential-store password: ", {
+        secret: true,
+      });
+      if (first !== second) {
+        console.error("  Password confirmation did not match.");
+        process.exit(1);
+      }
+      nextPassword = first;
+    }
+  } else {
+    nextPassword = envPassword;
+  }
+
+  if (!nextPassword) {
+    console.error(
+      `  Missing password. Set ${CRED_STORE_KEY_ENV} or run this command in an interactive terminal.`,
+    );
+    process.exit(1);
+  }
+
+  try {
+    const result = setCredentialStorePassword(nextPassword, {
+      currentPassword,
+    });
+    process.env[CRED_STORE_KEY_ENV] = nextPassword;
+    console.log(
+      `  ${G}✓${R} Credential store encrypted (${result.credentialCount} key${
+        result.credentialCount === 1 ? "" : "s"
+      }).`,
+    );
+    console.log(`  ${CRED_STORE_KEY_ENV} is required to unlock stored credentials.`);
+  } catch (error) {
+    console.error(`  ${error?.message || String(error)}`);
+    process.exit(1);
+  }
 }
 
 function handleSecurityPolicyValidate(args) {
@@ -1509,10 +1584,18 @@ function handleSecurityReplay(args) {
   }
 }
 
-function securityCommand(args) {
+async function securityCommand(args) {
   const [sub, ...rest] = args;
   if (!sub || sub === "help" || sub === "--help" || sub === "-h") {
     securityHelp();
+    return;
+  }
+  if (sub === "status") {
+    handleSecurityStatus(rest);
+    return;
+  }
+  if (sub === "set-password") {
+    await handleSecuritySetPassword(rest);
     return;
   }
   if (sub === "policy" && rest[0] === "validate") {
@@ -1565,6 +1648,8 @@ function help() {
     ${preferredCmd("status")}                  Show sandbox list and service status
 
   ${G}Security:${R}
+    ${preferredCmd("security status")}
+    ${preferredCmd("security set-password")}
     ${preferredCmd("security policy validate [--file PATH]")}
     ${preferredCmd("security events [--limit N] [--action A] [--hook H] [--risk R] [--id PATTERN] [--json] [--file PATH]")}
     ${preferredCmd("security replay <event-id> [--json] [--file PATH]")}
@@ -1582,7 +1667,7 @@ function help() {
     --delete-models                  Remove ClawKeeper-pulled Ollama models
 
   ${D}Powered by NVIDIA OpenShell · Nemotron · Agent Toolkit
-  Credentials saved in ~/.nemoclaw/credentials.json (mode 600)${R}
+  Credentials stored in ~/.nemoclaw/credentials.json (${preferredCmd("security set-password")} to encrypt)${R}
   ${D}https://github.com/hollyhongever/ClawKeeper${R}
 `);
 }
@@ -1627,7 +1712,7 @@ const [cmd, ...args] = process.argv.slice(2);
         debug(args);
         break;
       case "security":
-        securityCommand(args);
+        await securityCommand(args);
         break;
       case "uninstall":
         uninstall(args);

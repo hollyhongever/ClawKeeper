@@ -9,7 +9,7 @@
 
 <!-- start-intro -->
 ClawKeeper is a security-focused reference stack for running [OpenClaw](https://openclaw.ai) assistants inside [OpenShell](https://github.com/NVIDIA/OpenShell).
-It builds on the NemoClaw and OpenShell foundation, then adds ClawKeeper-specific security controls for runtime interception, install admission, audit logging, policy templates, credential protection, redaction, and staged rollout operations.
+It is an independent derivative project built on the NemoClaw and OpenShell foundation, then extended with ClawKeeper-specific security controls, runtime governance, and operator-facing guidance layers.
 <!-- end-intro -->
 
 > **Early-stage software**
@@ -19,7 +19,21 @@ It builds on the NemoClaw and OpenShell foundation, then adds ClawKeeper-specifi
 > The project is shared to gather feedback and enable early experimentation.
 > We welcome issues and discussion from the community while the project evolves.
 
-ClawKeeper keeps the upstream sandbox, blueprint, onboarding, and routing workflow, then layers a semantic security control plane on top. This repository documents ClawKeeper behavior and security enhancements; when details differ from upstream NemoClaw material, prefer the documentation in this repository.
+ClawKeeper keeps the upstream sandbox, blueprint, onboarding, and routing workflow, then layers ClawKeeper-native control planes on top. This repository documents ClawKeeper behavior and roadmap; when details differ from upstream NemoClaw material, prefer the documentation in this repository.
+
+## Project Positioning
+
+ClawKeeper is intentionally positioned as all three of the following:
+
+- an implementation built on the NemoClaw and OpenShell foundation,
+- a home for ClawKeeper-native governance modules rather than a verbatim upstream mirror,
+- and a long-running operations stack that starts with security hardening and expands into runtime watchdog and operator-intelligence capabilities.
+
+Repository guides for that positioning:
+
+- [NOTICE](NOTICE)
+- [Upstream Foundation and Attribution](UPSTREAM.md)
+- [ClawKeeper Roadmap](ROADMAP.md)
 
 ## Security Enhancements
 
@@ -31,6 +45,16 @@ ClawKeeper extends the base stack with a security module focused on operator vis
 - Hardened policy templates for development, CI, stricter egress posture, and sensitive-path protections.
 - Password-first onboarding, encrypted credential storage, and safer public-exposure defaults.
 - Deterministic redaction, staged dangerous-command policy, and rollout playbooks for `audit`, `warn`, and `enforce` promotion.
+
+## Planned Expansion Beyond Security
+
+Security is the first major ClawKeeper-native layer, not the final one.
+The current roadmap also includes:
+
+- Runtime Watchdog:
+  dead-loop detection, token overconsumption checks, timeout or stalled-task detection, and abnormal run-state alerts.
+- Operator Intelligence:
+  proactive recommendations for useful skills, workflow improvements, and operator playbooks based on deployment posture and runtime signals.
 
 Start with these pages if you want the ClawKeeper-specific security story:
 
@@ -164,6 +188,14 @@ Refer to the repository documentation for ClawKeeper-specific usage, architectur
 | [Network Policies](docs/reference/network-policies.md) | Baseline rules, operator approval flow, and egress control. |
 | [Security Best Practices](docs/security/best-practices.md) | Controls reference, risk framework, and posture profiles for sandbox security. |
 | [Troubleshooting](docs/reference/troubleshooting.md) | Common issues and resolution steps. |
+
+## Repository Guides
+
+| Guide | Description |
+|------|-------------|
+| [Upstream Foundation and Attribution](UPSTREAM.md) | Explains how ClawKeeper relates to NemoClaw and OpenShell, and how the repository handles attribution and branding. |
+| [Roadmap](ROADMAP.md) | Outlines the Security Control Plane, Runtime Watchdog, and Operator Intelligence phases. |
+| [NOTICE](NOTICE) | Short-form attribution and repository notice for derivative work context. |
 
 ## Project Structure
 

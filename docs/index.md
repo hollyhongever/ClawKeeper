@@ -42,6 +42,9 @@ ClawKeeper's landing experience emphasizes the security module and operator work
 - Hardened security policy templates plus staged `audit`, `warn`, and `enforce` rollout guidance.
 - Password-first onboarding, encrypted credential storage, deterministic redaction, and public-exposure hardening.
 
+This security module is the first major ClawKeeper-native layer.
+The broader repository roadmap also includes planned Runtime Watchdog and Operator Intelligence modules for long-running task governance and proactive operator guidance.
+
 ## Get Started
 
 Install the CLI and launch a sandboxed OpenClaw instance in a few commands.

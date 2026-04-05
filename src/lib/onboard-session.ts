@@ -90,6 +90,20 @@ export interface SessionUpdates {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
+const REDACTION_TOKEN = "<REDACTED>";
+const URL_PATTERN = /https?:\/\/[^\s'"`]+/g;
+const URL_TOKEN_PARAM_RE = /(^|[-_])(?:signature|sig|token|auth|access_token)$/i;
+const REDACT_PATTERNS: Array<[RegExp, string]> = [
+  [
+    /((?:["'])?(?:[A-Za-z0-9_.-]*?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|credential|private[_-]?key|client[_-]?secret)|[A-Za-z0-9_.-]+_key)(?:["'])?\s*[:=]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s,&}"'\]]+)/gi,
+    `$1${REDACTION_TOKEN}`,
+  ],
+  [/\bnvapi-[A-Za-z0-9_-]{10,}\b/g, REDACTION_TOKEN],
+  [/\bnvcf-[A-Za-z0-9_-]{10,}\b/g, REDACTION_TOKEN],
+  [/\b(?:ghp_|github_pat_)[A-Za-z0-9_]{20,}\b/g, REDACTION_TOKEN],
+  [/\bsk-[A-Za-z0-9_-]{10,}\b/g, REDACTION_TOKEN],
+  [/(Bearer\s+)\S+/gi, `$1${REDACTION_TOKEN}`],
+];
 
 function ensureSessionDir(): void {
   fs.mkdirSync(SESSION_DIR, { recursive: true, mode: 0o700 });
@@ -119,17 +133,18 @@ export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function applySecretRedaction(input: string): string {
+  let result = input;
+  for (const [pattern, replacement] of REDACT_PATTERNS) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
+}
+
 export function redactSensitiveText(value: unknown): string | null {
   if (typeof value !== "string") return null;
-  return value
-    .replace(
-      /(NVIDIA_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|GEMINI_API_KEY|COMPATIBLE_API_KEY|COMPATIBLE_ANTHROPIC_API_KEY|BRAVE_API_KEY)=\S+/gi,
-      "$1=<REDACTED>",
-    )
-    .replace(/Bearer\s+\S+/gi, "Bearer <REDACTED>")
-    .replace(/nvapi-[A-Za-z0-9_-]{10,}/g, "<REDACTED>")
-    .replace(/ghp_[A-Za-z0-9]{20,}/g, "<REDACTED>")
-    .replace(/sk-[A-Za-z0-9_-]{10,}/g, "<REDACTED>")
+  return applySecretRedaction(value)
+    .replace(URL_PATTERN, (candidate) => redactUrl(candidate) ?? candidate)
     .slice(0, 240);
 }
 
@@ -159,14 +174,14 @@ export function redactUrl(value: unknown): string | null {
       url.password = "";
     }
     for (const key of [...url.searchParams.keys()]) {
-      if (/(^|[-_])(?:signature|sig|token|auth|access_token)$/i.test(key)) {
-        url.searchParams.set(key, "<REDACTED>");
+      if (URL_TOKEN_PARAM_RE.test(key)) {
+        url.searchParams.set(key, REDACTION_TOKEN);
       }
     }
     url.hash = "";
     return url.toString();
   } catch {
-    return redactSensitiveText(value);
+    return applySecretRedaction(value);
   }
 }
 

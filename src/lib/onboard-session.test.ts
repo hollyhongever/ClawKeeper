@@ -206,6 +206,18 @@ describe("onboard session", () => {
     expect(loaded.failure.message).toBe(loaded.steps.inference.error);
   });
 
+  it("applies deterministic redaction for mixed secret content", () => {
+    const input =
+      "Authorization: Bearer abc123def456 API_KEY=secret https://alice:secret@example.com/?token=abc123";
+    const first = session.redactSensitiveText(input);
+    const second = session.redactSensitiveText(input);
+
+    expect(second).toBe(first);
+    expect(first).toBe(
+      "Authorization: Bearer <REDACTED> API_KEY=<REDACTED> https://example.com/?token=%3CREDACTED%3E",
+    );
+  });
+
   it("summarizes the session for debug output", () => {
     session.saveSession(session.createSession({ sandboxName: "my-assistant" }));
     session.markStepStarted("preflight");

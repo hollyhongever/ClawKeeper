@@ -173,70 +173,65 @@ describe("validateName", () => {
 describe("redact", () => {
   it("masks NVIDIA API keys", () => {
     const { redact } = require(runnerPath);
-    expect(redact("key is nvapi-abc123XYZ_def456")).toBe("key is nvap******************");
+    expect(redact("key is nvapi-abc123XYZ_def456")).toBe("key is <REDACTED>");
   });
 
   it("masks NVCF keys", () => {
     const { redact } = require(runnerPath);
-    expect(redact("nvcf-abcdef1234567890")).toBe("nvcf*****************");
+    expect(redact("nvcf-abcdef1234567890")).toBe("<REDACTED>");
   });
 
   it("masks bearer tokens", () => {
     const { redact } = require(runnerPath);
     expect(redact("Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload")).toBe(
-      "Authorization: Bearer eyJh********************",
+      "Authorization: Bearer <REDACTED>",
     );
   });
 
   it("masks key assignments in commands", () => {
     const { redact } = require(runnerPath);
-    expect(redact("export NVIDIA_API_KEY=nvapi-realkey12345")).toContain("nvap");
-    expect(redact("export NVIDIA_API_KEY=nvapi-realkey12345")).not.toContain("realkey12345");
+    expect(redact("export NVIDIA_API_KEY=nvapi-realkey12345")).toBe(
+      "export NVIDIA_API_KEY=<REDACTED>",
+    );
   });
 
   it("masks variables ending in _KEY", () => {
     const { redact } = require(runnerPath);
     const output = redact('export SERVICE_KEY="supersecretvalue12345"');
-    expect(output).not.toContain("supersecretvalue12345");
-    expect(output).toContain('export SERVICE_KEY="supe');
+    expect(output).toBe("export SERVICE_KEY=<REDACTED>");
   });
 
   it("masks bare GitHub personal access tokens", () => {
     const { redact } = require(runnerPath);
     const output = redact("token ghp_abcdefghijklmnopqrstuvwxyz1234567890");
-    expect(output).toContain("ghp_");
-    expect(output).not.toContain("abcdefghijklmnopqrstuvwxyz1234567890");
+    expect(output).toBe("token <REDACTED>");
   });
 
   it("masks bearer tokens case-insensitively", () => {
     const { redact } = require(runnerPath);
-    expect(redact("authorization: bearer someBearerToken")).toContain("some****");
+    expect(redact("authorization: bearer someBearerToken")).toContain("bearer <REDACTED>");
     expect(redact("authorization: bearer someBearerToken")).not.toContain("someBearerToken");
-    expect(redact("AUTHORIZATION: BEARER someBearerToken")).toContain("some****");
+    expect(redact("AUTHORIZATION: BEARER someBearerToken")).toContain("BEARER <REDACTED>");
     expect(redact("AUTHORIZATION: BEARER someBearerToken")).not.toContain("someBearerToken");
   });
 
   it("masks bearer tokens with repeated spacing", () => {
     const { redact } = require(runnerPath);
     const output = redact("Authorization: Bearer   someBearerToken");
-    expect(output).toContain("some****");
+    expect(output).toContain("Bearer   <REDACTED>");
     expect(output).not.toContain("someBearerToken");
   });
 
   it("masks quoted assignment values", () => {
     const { redact } = require(runnerPath);
     const output = redact('API_KEY="secret123abc"');
-    expect(output).not.toContain("secret123abc");
-    expect(output).toContain('API_KEY="sec');
+    expect(output).toBe("API_KEY=<REDACTED>");
   });
 
   it("masks multiple secrets in one string", () => {
     const { redact } = require(runnerPath);
     const output = redact("nvapi-firstkey12345 nvapi-secondkey67890");
-    expect(output).not.toContain("firstkey12345");
-    expect(output).not.toContain("secondkey67890");
-    expect(output).toContain("nvap");
-    expect(output).toContain(" ");
+    expect(output).toBe("<REDACTED> <REDACTED>");
   });
 
   it("masks URL credentials and auth query parameters", () => {
@@ -244,13 +239,29 @@ describe("redact", () => {
     const output = redact(
       "https://alice:secret@example.com/v1/models?auth=abc123456789&sig=def987654321&keep=yes",
     );
-    expect(output).toBe("https://alice:****@example.com/v1/models?auth=****&sig=****&keep=yes");
+    expect(output).toBe(
+      "https://example.com/v1/models?auth=%3CREDACTED%3E&sig=%3CREDACTED%3E&keep=yes",
+    );
   });
 
   it("masks auth-style query parameters case-insensitively", () => {
     const { redact } = require(runnerPath);
     const output = redact("https://example.com?Signature=secret123456&AUTH=anothersecret123");
-    expect(output).toBe("https://example.com/?Signature=****&AUTH=****");
+    expect(output).toBe(
+      "https://example.com/?Signature=%3CREDACTED%3E&AUTH=%3CREDACTED%3E",
+    );
+  });
+
+  it("is deterministic for repeated identical input", () => {
+    const { redact } = require(runnerPath);
+    const input =
+      "Authorization: Bearer abc123def456 API_KEY=secret https://alice:secret@example.com/?token=abc123";
+    const first = redact(input);
+    const second = redact(input);
+    expect(second).toBe(first);
+    expect(first).toBe(
+      "Authorization: Bearer <REDACTED> API_KEY=<REDACTED> https://example.com/?token=%3CREDACTED%3E",
+    );
   });
 
   it("leaves non-secret strings untouched", () => {
@@ -288,7 +299,7 @@ describe("regression guards", () => {
       }
 
       expect(error).toBeInstanceOf(Error);
-      expect(error.message).toContain("ghp_");
+      expect(error.message).toContain("<REDACTED>");
       expect(error.message).not.toContain("supersecretvalue12345");
       expect(error.message).not.toContain("abcdefghijklmnopqrstuvwxyz1234567890");
     } finally {
@@ -324,8 +335,8 @@ describe("regression guards", () => {
       expect(Array.isArray(error.output)).toBe(true);
       expect(error.output[0]).not.toContain("nvapi-aaaabbbbcccc1111");
       expect(error.output[1]).not.toContain("secret123456");
-      expect(error.output[0]).toContain("****");
-      expect(error.output[1]).toContain("****");
+      expect(error.output[0]).toContain("<REDACTED>");
+      expect(error.output[1]).toContain("<REDACTED>");
     } finally {
       childProcess.execSync = originalExecSync;
       delete require.cache[require.resolve(runnerPath)];
@@ -353,8 +364,8 @@ describe("regression guards", () => {
       delete require.cache[require.resolve(runnerPath)];
       const { run } = require(runnerPath);
       expect(() => run("echo fail")).toThrow("exit:1");
-      expect(stdoutSpy).toHaveBeenCalledWith("token ghp_********************\n");
-      expect(stderrSpy).toHaveBeenCalledWith('export SERVICE_KEY="supe*****************"\n');
+      expect(stdoutSpy).toHaveBeenCalledWith("token <REDACTED>\n");
+      expect(stderrSpy).toHaveBeenCalledWith("export SERVICE_KEY=<REDACTED>\n");
       expect(errorSpy).toHaveBeenCalledWith("  Command failed (exit 1): echo fail");
     } finally {
       childProcess.spawnSync = originalSpawnSync;
@@ -387,7 +398,9 @@ describe("regression guards", () => {
       const { runInteractive } = require(runnerPath);
       runInteractive("echo interactive");
       expect(calls[0][2].stdio).toEqual(["inherit", "pipe", "pipe"]);
-      expect(stdoutSpy).toHaveBeenCalledWith("visit https://alice:****@example.com/?token=****\n");
+      expect(stdoutSpy).toHaveBeenCalledWith(
+        "visit https://example.com/?token=%3CREDACTED%3E\n",
+      );
       expect(stderrSpy).not.toHaveBeenCalled();
     } finally {
       childProcess.spawnSync = originalSpawnSync;

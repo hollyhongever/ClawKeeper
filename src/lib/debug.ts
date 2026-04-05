@@ -45,19 +45,46 @@ function section(title: string): void {
 // Secret redaction
 // ---------------------------------------------------------------------------
 
-const REDACT_PATTERNS: [RegExp, string][] = [
-  [/(NVIDIA_API_KEY|API_KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|_KEY)=\S+/gi, "$1=<REDACTED>"],
-  [/nvapi-[A-Za-z0-9_-]{10,}/g, "<REDACTED>"],
-  [/(?:ghp_|github_pat_)[A-Za-z0-9_]{30,}/g, "<REDACTED>"],
-  [/(Bearer )\S+/gi, "$1<REDACTED>"],
+const REDACTION_TOKEN = "<REDACTED>";
+const URL_PATTERN = /https?:\/\/[^\s'"`]+/g;
+const URL_TOKEN_PARAM_RE = /(^|[-_])(?:signature|sig|token|auth|access_token)$/i;
+const REDACT_PATTERNS: Array<[RegExp, string]> = [
+  [
+    /((?:["'])?(?:[A-Za-z0-9_.-]*?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|credential|private[_-]?key|client[_-]?secret)|[A-Za-z0-9_.-]+_key)(?:["'])?\s*[:=]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s,&}"'\]]+)/gi,
+    `$1${REDACTION_TOKEN}`,
+  ],
+  [/\bnvapi-[A-Za-z0-9_-]{10,}\b/g, REDACTION_TOKEN],
+  [/\bnvcf-[A-Za-z0-9_-]{10,}\b/g, REDACTION_TOKEN],
+  [/\b(?:ghp_|github_pat_)[A-Za-z0-9_]{20,}\b/g, REDACTION_TOKEN],
+  [/\bsk-[A-Za-z0-9_-]{10,}\b/g, REDACTION_TOKEN],
+  [/(Bearer\s+)\S+/gi, `$1${REDACTION_TOKEN}`],
 ];
+
+function redactUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    if (url.username || url.password) {
+      url.username = "";
+      url.password = "";
+    }
+    for (const key of [...url.searchParams.keys()]) {
+      if (URL_TOKEN_PARAM_RE.test(key)) {
+        url.searchParams.set(key, REDACTION_TOKEN);
+      }
+    }
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
 
 export function redact(text: string): string {
   let result = text;
   for (const [pattern, replacement] of REDACT_PATTERNS) {
     result = result.replace(pattern, replacement);
   }
-  return result;
+  return result.replace(URL_PATTERN, (value) => redactUrl(value));
 }
 
 // ---------------------------------------------------------------------------

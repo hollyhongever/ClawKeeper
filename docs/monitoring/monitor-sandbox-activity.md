@@ -22,7 +22,7 @@ status: published
 
 # Monitor Sandbox Activity and Debug Issues
 
-Use the NemoClaw status, logs, and TUI tools together to inspect sandbox health, trace agent behavior, and diagnose problems.
+Use the NemoClaw status, logs, service events, and TUI tools together to inspect sandbox health, trace agent behavior, and diagnose problems.
 
 ## Prerequisites
 
@@ -45,6 +45,25 @@ Key fields in the output include the following:
 
 Run `nemoclaw <name> status` on the host to check sandbox state.
 Use `openshell sandbox list` for the underlying sandbox details.
+
+## View Auxiliary Service State and Recent Events
+
+Run the host-side service status command:
+
+```console
+$ clawkeeper status
+```
+
+This view includes the current state of the auxiliary services and the most recent structured service events.
+
+For machine-readable output, use:
+
+```console
+$ clawkeeper status --json
+```
+
+The structured event log is stored under `/tmp/nemoclaw-services-<sandbox-name>/events.jsonl`.
+Refer to [Use the NemoClaw Telegram Bridge, Push Notifications, and Service Monitoring](../deployment/set-up-telegram-bridge.md) for the full host-side Telegram and service-monitor workflow.
 
 ## View Blueprint and Sandbox Logs
 

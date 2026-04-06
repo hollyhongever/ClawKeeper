@@ -305,7 +305,7 @@ Security Module Updates <security/security-module-updates>
 :hidden:
 
 Deploy to a Remote GPU Instance <deployment/deploy-to-remote-gpu>
-Set Up the Telegram Bridge <deployment/set-up-telegram-bridge>
+Telegram Bridge and Notifications <deployment/set-up-telegram-bridge>
 Sandbox Hardening <deployment/sandbox-hardening>
 ```
 

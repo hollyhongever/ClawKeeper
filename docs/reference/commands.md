@@ -199,13 +199,13 @@ For a remote Brev instance, SSH to the instance and run `openshell term` there, 
 
 ### `clawkeeper start`
 
-Start auxiliary services, such as the Telegram bridge and cloudflared tunnel.
+Start auxiliary services, such as the Telegram bridge, service monitor, and cloudflared tunnel.
 
 ```console
 $ clawkeeper start
 ```
 
-Requires `TELEGRAM_BOT_TOKEN` for the Telegram bridge.
+Requires `TELEGRAM_BOT_TOKEN` and `NVIDIA_API_KEY` for the Telegram bridge.
 
 ### `clawkeeper stop`
 
@@ -217,10 +217,16 @@ $ clawkeeper stop
 
 ### `clawkeeper status`
 
-Show the sandbox list and the status of auxiliary services.
+Show the sandbox list, the status of auxiliary services, and recent service events.
 
 ```console
 $ clawkeeper status
+```
+
+For machine-readable output:
+
+```console
+$ clawkeeper status --json
 ```
 
 ### `clawkeeper security policy validate`

@@ -10,6 +10,7 @@
 <!-- start-intro -->
 ClawKeeper is a security-focused reference stack for running [OpenClaw](https://openclaw.ai) assistants inside [OpenShell](https://github.com/NVIDIA/OpenShell).
 It is an independent derivative project built on the NemoClaw and OpenShell foundation, then extended with ClawKeeper-specific security controls, runtime governance, and operator-facing guidance layers.
+ClawKeeper is Team ZJU001's entry for the inaugural China NVIDIA DGX Spark Hackathon.
 <!-- end-intro -->
 
 > **Early-stage software**

@@ -28,6 +28,12 @@ It builds on the NemoClaw and OpenShell foundation, then adds ClawKeeper-specifi
 ClawKeeper keeps the upstream sandbox, routing, onboarding, and blueprint lifecycle model.
 Its main differentiation is the security module implemented in this repository and documented under the `docs/security/` section.
 
+## Project Background
+
+ClawKeeper is Team ZJU001's entry for the inaugural China NVIDIA DGX Spark Hackathon.
+The project uses NemoClaw and OpenShell as its starting point, then turns that prototype base into a ClawKeeper-specific operations stack with stronger security controls and clearer operator workflows.
+The first major ClawKeeper-native track is the Security Control Plane documented in this repository; the next planned tracks are Runtime Watchdog and Operator Intelligence.
+
 ## Project Positioning
 
 ClawKeeper should be understood as a layered project rather than a pure rebrand.

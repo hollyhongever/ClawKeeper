@@ -1,13 +1,13 @@
 ---
 title:
-  page: "NVIDIA NemoClaw Developer Guide"
-  nav: "NemoClaw"
+  page: "ClawKeeper Developer Guide"
+  nav: "ClawKeeper"
 description:
-  main: "NemoClaw is an open source reference stack that simplifies running OpenClaw always-on assistants more safely, with a single command."
-  agent: "Provides an open source reference stack that simplifies running OpenClaw always-on assistants more safely. Use when setting up NemoClaw, exploring the project, or looking for the landing page."
-keywords: ["nemoclaw open source reference stack", "openclaw always-on assistants", "nvidia openshell", "nvidia nemotron"]
+  main: "ClawKeeper is a security-focused OpenClaw operations stack built on the NemoClaw and OpenShell foundation."
+  agent: "Provides the ClawKeeper landing page and security-focused documentation entry point. Use when setting up ClawKeeper, exploring its security module, or orienting to the project."
+keywords: ["clawkeeper developer guide", "clawkeeper security module", "openclaw operations", "openshell security"]
 topics: ["generative_ai", "ai_agents"]
-tags: ["openclaw", "openshell", "sandboxing", "inference_routing", "nemoclaw"]
+tags: ["openclaw", "openshell", "sandboxing", "security", "clawkeeper"]
 content:
   type: get_started
   difficulty: technical_beginner
@@ -20,15 +20,30 @@ status: published
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# NVIDIA NemoClaw
+# ClawKeeper
 
 ```{include} ../README.md
 :start-after: <!-- start-badges -->
 :end-before: <!-- end-badges -->
 ```
 
-NVIDIA NemoClaw is an open source reference stack that simplifies running [OpenClaw](https://openclaw.ai) always-on assistants more safely.
-It installs the [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell) runtime, part of NVIDIA Agent Toolkit, an environment designed for executing claws with additional security, and open source models like [NVIDIA Nemotron](https://build.nvidia.com).
+ClawKeeper is a security-focused reference stack for running [OpenClaw](https://openclaw.ai) assistants inside [OpenShell](https://github.com/NVIDIA/OpenShell).
+It builds on the NemoClaw and OpenShell foundation, then adds ClawKeeper-specific controls for runtime interception, install admission, audit logging, policy templates, credential protection, redaction, and staged rollout operations.
+
+Use this documentation set as the source of truth for ClawKeeper behavior. It intentionally highlights ClawKeeper-specific security and operator workflows rather than mirroring upstream product pages.
+
+## Security Focus
+
+ClawKeeper's landing experience emphasizes the security module and operator workflows added in this repository:
+
+- `before_tool_call` and `after_tool_call` interception for semantic risk grading.
+- `before_install` admission scanning for third-party skill installs.
+- `security-event.v1` audit records with validation, listing, and replay CLI commands.
+- Hardened security policy templates plus staged `audit`, `warn`, and `enforce` rollout guidance.
+- Password-first onboarding, encrypted credential storage, deterministic redaction, and public-exposure hardening.
+
+This security module is the first major ClawKeeper-native layer.
+The broader repository roadmap also includes planned Runtime Watchdog and Operator Intelligence modules for long-running task governance and proactive operator guidance.
 
 ## Get Started
 
@@ -78,13 +93,13 @@ Install the CLI and launch a sandboxed OpenClaw instance in a few commands.
     <span class="nc-term-dot nc-term-dot-g"></span>
   </div>
   <div class="nc-term-body">
-    <div><span class="nc-ps">$ </span>curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash</div>
+    <div><span class="nc-ps">$ </span>curl -fsSL https://raw.githubusercontent.com/hollyhongever/ClawKeeper/main/install.sh | bash</div>
   </div>
 </div>
 ```
 
-Run `nemoclaw --help` in your terminal to view the full CLI reference.
-You can also clone the [NemoClaw repository](https://github.com/NVIDIA/NemoClaw) to explore the plugin source and blueprint.
+Run `clawkeeper --help` in your terminal to view the full CLI reference.
+You can also clone the [ClawKeeper repository](https://github.com/hollyhongever/ClawKeeper) to explore the plugin source, security module, and blueprint.
 
 Proceed to the [Quickstart](get-started/quickstart.md) for step-by-step instructions.
 
@@ -95,14 +110,34 @@ Proceed to the [Quickstart](get-started/quickstart.md) for step-by-step instruct
 ::::{grid} 2 2 3 3
 :gutter: 3
 
-:::{grid-item-card} About NemoClaw
+:::{grid-item-card} About ClawKeeper
 :link: about/overview
 :link-type: doc
 
-Learn what NemoClaw does and how it integrates OpenClaw with OpenShell.
+Learn what ClawKeeper adds on top of the NemoClaw and OpenShell foundation.
 
 +++
 {bdg-secondary}`Concept`
+:::
+
+:::{grid-item-card} Security Enhancement Plan
+:link: security/clawkeeper-security-enhancement-plan
+:link-type: doc
+
+Implementation blueprint for tool interception, install admission, audit, policy, and rollout phases.
+
++++
+{bdg-secondary}`Reference`
+:::
+
+:::{grid-item-card} Security Module Updates
+:link: security/security-module-updates
+:link-type: doc
+
+Track which security milestones landed and what changed for operators and reviewers.
+
++++
+{bdg-secondary}`Reference`
 :::
 
 :::{grid-item-card} Quickstart
@@ -123,16 +158,6 @@ CLI commands for launching, connecting, monitoring, and managing sandboxes.
 
 +++
 {bdg-secondary}`Reference`
-:::
-
-:::{grid-item-card} Inference Options
-:link: inference/inference-options
-:link-type: doc
-
-Providers available during onboarding and how inference routing works.
-
-+++
-{bdg-secondary}`Concept`
 :::
 
 :::{grid-item-card} How It Works
@@ -195,6 +220,16 @@ Operational rollout guidance for staged `audit`, `warn`, and `enforce` promotion
 {bdg-secondary}`How-To`
 :::
 
+:::{grid-item-card} Inference Options
+:link: inference/inference-options
+:link-type: doc
+
+Providers available during onboarding and how inference routing works.
+
++++
+{bdg-secondary}`Concept`
+:::
+
 :::{grid-item-card} How-To Guides
 :link: inference/switch-inference-providers
 :link-type: doc
@@ -222,7 +257,7 @@ Home <self>
 ```
 
 ```{toctree}
-:caption: About NemoClaw
+:caption: About ClawKeeper
 :hidden:
 
 Overview <about/overview>
@@ -303,7 +338,7 @@ Troubleshooting <reference/troubleshooting>
 :caption: Resources
 :hidden:
 
-Report Vulnerabilities <https://github.com/NVIDIA/NemoClaw/blob/main/SECURITY.md>
+Report Vulnerabilities <https://github.com/hollyhongever/ClawKeeper/blob/main/SECURITY.md>
 resources/license
 Discord <https://discord.gg/XFpfPv9Uvx>
 ```

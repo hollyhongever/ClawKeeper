@@ -1,4 +1,4 @@
-# 🦞 ClawKeeper: Reference Stack for Running OpenClaw in OpenShell
+# ClawKeeper: Security-Hardened OpenClaw Operations on OpenShell
 
 <!-- start-badges -->
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue)](https://github.com/hollyhongever/ClawKeeper/blob/main/LICENSE)
@@ -8,19 +8,60 @@
 <!-- end-badges -->
 
 <!-- start-intro -->
-ClawKeeper is an open source reference stack that simplifies running [OpenClaw](https://openclaw.ai) always-on assistants more safely.
-It installs the [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell) runtime, part of NVIDIA Agent Toolkit, which provides additional security for running autonomous agents.
+ClawKeeper is a security-focused reference stack for running [OpenClaw](https://openclaw.ai) assistants inside [OpenShell](https://github.com/NVIDIA/OpenShell).
+It is an independent derivative project built on the NemoClaw and OpenShell foundation, then extended with ClawKeeper-specific security controls, runtime governance, and operator-facing guidance layers.
 <!-- end-intro -->
 
-> **Alpha software**
+> **Early-stage software**
 >
-> ClawKeeper is available in early preview starting March 16, 2026.
-> This software is not production-ready.
+> ClawKeeper is experimental and not production-ready.
 > Interfaces, APIs, and behavior may change without notice as we iterate on the design.
 > The project is shared to gather feedback and enable early experimentation.
 > We welcome issues and discussion from the community while the project evolves.
 
-ClawKeeper adds guided onboarding, a hardened blueprint, state management, messaging bridges, routed inference, and layered protection on top of the [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell) runtime. For the full feature list, refer to [Overview](https://docs.nvidia.com/nemoclaw/latest/about/overview.html). For the system diagram, component model, and blueprint lifecycle, refer to [How It Works](https://docs.nvidia.com/nemoclaw/latest/about/how-it-works.html) and [Architecture](https://docs.nvidia.com/nemoclaw/latest/reference/architecture.html).
+ClawKeeper keeps the upstream sandbox, blueprint, onboarding, and routing workflow, then layers ClawKeeper-native control planes on top. This repository documents ClawKeeper behavior and roadmap; when details differ from upstream NemoClaw material, prefer the documentation in this repository.
+
+## Project Positioning
+
+ClawKeeper is intentionally positioned as all three of the following:
+
+- an implementation built on the NemoClaw and OpenShell foundation,
+- a home for ClawKeeper-native governance modules rather than a verbatim upstream mirror,
+- and a long-running operations stack that starts with security hardening and expands into runtime watchdog and operator-intelligence capabilities.
+
+Repository guides for that positioning:
+
+- [NOTICE](NOTICE)
+- [Upstream Foundation and Attribution](UPSTREAM.md)
+- [ClawKeeper Roadmap](ROADMAP.md)
+
+## Security Enhancements
+
+ClawKeeper extends the base stack with a security module focused on operator visibility and higher-confidence automation.
+
+- Runtime interception with `before_tool_call` and `after_tool_call` risk grading for dangerous shell, filesystem, and network actions.
+- Install-time admission controls with offline-first scanning through `before_install`.
+- Structured `security-event.v1` audit output plus `clawkeeper security policy validate`, `security events`, and `security replay` CLI workflows.
+- Hardened policy templates for development, CI, stricter egress posture, and sensitive-path protections.
+- Password-first onboarding, encrypted credential storage, and safer public-exposure defaults.
+- Deterministic redaction, staged dangerous-command policy, and rollout playbooks for `audit`, `warn`, and `enforce` promotion.
+
+## Planned Expansion Beyond Security
+
+Security is the first major ClawKeeper-native layer, not the final one.
+The current roadmap also includes:
+
+- Runtime Watchdog:
+  dead-loop detection, token overconsumption checks, timeout or stalled-task detection, and abnormal run-state alerts.
+- Operator Intelligence:
+  proactive recommendations for useful skills, workflow improvements, and operator playbooks based on deployment posture and runtime signals.
+
+Start with these pages if you want the ClawKeeper-specific security story:
+
+- [ClawKeeper Security Enhancement Plan](docs/security/clawkeeper-security-enhancement-plan.md)
+- [Security Module Updates](docs/security/security-module-updates.md)
+- [Public Exposure Rollout Playbook](docs/security/public-exposure-rollout-playbook.md)
+- [Security Best Practices](docs/security/best-practices.md)
 
 ## Getting Started
 
@@ -128,26 +169,33 @@ curl -fsSL https://raw.githubusercontent.com/hollyhongever/ClawKeeper/main/unins
 | `--keep-openshell` | Leave the `openshell` binary installed.              |
 | `--delete-models`  | Also remove ClawKeeper-pulled Ollama models.         |
 
-For troubleshooting installation or onboarding issues, see the [Troubleshooting guide](https://docs.nvidia.com/nemoclaw/latest/reference/troubleshooting.html).
+For troubleshooting installation or onboarding issues, see the [Troubleshooting guide](docs/reference/troubleshooting.md).
 
 <!-- end-quickstart-guide -->
 
 ## Documentation
 
-Refer to the following pages on the official documentation website for more information on ClawKeeper.
+Refer to the repository documentation for ClawKeeper-specific usage, architecture, and security behavior.
 
 | Page | Description |
 |------|-------------|
-| [Overview](https://docs.nvidia.com/nemoclaw/latest/about/overview.html) | What ClawKeeper does and how it fits together. |
-| [How It Works](https://docs.nvidia.com/nemoclaw/latest/about/how-it-works.html) | Plugin, blueprint, sandbox lifecycle, and protection layers. |
-| [Architecture](https://docs.nvidia.com/nemoclaw/latest/reference/architecture.html) | Plugin structure, blueprint lifecycle, sandbox environment, and host-side state. |
-| [Inference Options](https://docs.nvidia.com/nemoclaw/latest/inference/inference-options.html) | Supported providers, validation, and routed inference configuration. |
-| [Network Policies](https://docs.nvidia.com/nemoclaw/latest/reference/network-policies.html) | Baseline rules, operator approval flow, and egress control. |
-| [Customize Network Policy](https://docs.nvidia.com/nemoclaw/latest/network-policy/customize-network-policy.html) | Static and dynamic policy changes, presets. |
-| [Security Best Practices](https://docs.nvidia.com/nemoclaw/latest/security/best-practices.html) | Controls reference, risk framework, and posture profiles for sandbox security. |
-| [Sandbox Hardening](https://docs.nvidia.com/nemoclaw/latest/deployment/sandbox-hardening.html) | Container security measures, capability drops, process limits. |
-| [CLI Commands](https://docs.nvidia.com/nemoclaw/latest/reference/commands.html) | Full ClawKeeper CLI command reference. |
-| [Troubleshooting](https://docs.nvidia.com/nemoclaw/latest/reference/troubleshooting.html) | Common issues and resolution steps. |
+| [Overview](docs/about/overview.md) | What ClawKeeper is, where it builds on upstream, and which security layers it adds. |
+| [How It Works](docs/about/how-it-works.md) | Plugin, blueprint, sandbox lifecycle, and host-side control flow. |
+| [ClawKeeper Security Enhancement Plan](docs/security/clawkeeper-security-enhancement-plan.md) | Implementation blueprint for runtime interception, install admission, policy, and audit behavior. |
+| [Security Module Updates](docs/security/security-module-updates.md) | Changelog of landed security milestones and operator-facing changes. |
+| [Public Exposure Rollout Playbook](docs/security/public-exposure-rollout-playbook.md) | Staged rollout guide for exposing hardened ClawKeeper deployments more safely. |
+| [CLI Commands](docs/reference/commands.md) | Full ClawKeeper CLI command reference. |
+| [Network Policies](docs/reference/network-policies.md) | Baseline rules, operator approval flow, and egress control. |
+| [Security Best Practices](docs/security/best-practices.md) | Controls reference, risk framework, and posture profiles for sandbox security. |
+| [Troubleshooting](docs/reference/troubleshooting.md) | Common issues and resolution steps. |
+
+## Repository Guides
+
+| Guide | Description |
+|------|-------------|
+| [Upstream Foundation and Attribution](UPSTREAM.md) | Explains how ClawKeeper relates to NemoClaw and OpenShell, and how the repository handles attribution and branding. |
+| [Roadmap](ROADMAP.md) | Outlines the Security Control Plane, Runtime Watchdog, and Operator Intelligence phases. |
+| [NOTICE](NOTICE) | Short-form attribution and repository notice for derivative work context. |
 
 ## Project Structure
 
@@ -160,11 +208,12 @@ ClawKeeper/
 │   └── src/
 │       ├── blueprint/    # Runner, snapshot, SSRF validation, state
 │       ├── commands/     # Slash commands, migration state
+│       ├── security/     # Risk engine, hooks, policies, audit types
 │       └── onboard/      # Onboarding config
 ├── nemoclaw-blueprint/   # Blueprint YAML and network policies
 ├── scripts/          # Install helpers, setup, automation
 ├── test/             # Integration and E2E tests
-└── docs/             # User-facing docs (Sphinx/MyST)
+└── docs/             # User-facing docs, including security design and rollout guides
 ```
 
 ## Community
@@ -181,15 +230,10 @@ We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for development
 
 ## Security
 
-NVIDIA takes security seriously.
-If you discover a vulnerability in ClawKeeper, **DO NOT open a public issue.**
-Use one of the private reporting channels described in [SECURITY.md](SECURITY.md):
+If you discover a vulnerability in ClawKeeper, **do not open a public issue**.
+Use the private reporting workflow described in [SECURITY.md](SECURITY.md).
 
-- Submit a report through the [NVIDIA Vulnerability Disclosure Program](https://www.nvidia.com/en-us/security/report-vulnerability/).
-- Send an email to [psirt@nvidia.com](mailto:psirt@nvidia.com) encrypted with the [NVIDIA PGP key](https://www.nvidia.com/en-us/security/pgp-key).
-- Use [GitHub's private vulnerability reporting](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configuring-private-vulnerability-reporting-for-a-repository) to submit a report directly on this repository.
-
-For security bulletins and PSIRT policies, visit the [NVIDIA Product Security](https://www.nvidia.com/en-us/security/) portal.
+If the issue appears to originate in upstream OpenShell, NemoClaw, or another dependency rather than ClawKeeper-specific code, coordinate disclosure with the upstream project or vendor as well.
 
 ## Notice and Disclaimer
 

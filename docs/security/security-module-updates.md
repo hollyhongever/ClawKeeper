@@ -25,6 +25,33 @@ status: published
 This page records implementation updates for the ClawKeeper security module.
 Use it as the release log for security milestones after the baseline plan is approved.
 
+## 2026-04-05 (Repository Positioning and Roadmap Alignment)
+
+### Added
+
+- Added repository-level attribution and positioning documents:
+  - `NOTICE`
+  - `UPSTREAM.md`
+  - `ROADMAP.md`
+- Added roadmap framing for planned ClawKeeper-native follow-on modules:
+  - Runtime Watchdog
+  - Operator Intelligence
+
+### Changed
+
+- Updated `README.md`, `docs/index.md`, and `docs/about/overview.md` to present ClawKeeper as an independent derivative project built on the NemoClaw and OpenShell foundation rather than an upstream mirror.
+- Updated security planning language so the security module is clearly framed as the first major ClawKeeper-native governance layer.
+- Updated `docs/security/clawkeeper-security-enhancement-plan.md` to:
+  - mark M6-M10 public-exposure work as completed on `main`
+  - retain branch-topology notes as historical rollout context
+  - separate planned Runtime Watchdog and Operator Intelligence tracks from the scope of the security acceptance criteria
+
+### Validation Snapshot
+
+- Reviewed modified repository entry points to remove stale upstream homepage and branding references from the updated ClawKeeper landing surfaces.
+- Cross-checked `README.md`, overview content, and security planning docs for consistent upstream-attribution language and roadmap terminology.
+- No runtime code paths were changed in this documentation and positioning pass.
+
 ## 2026-04-04
 
 ### Added

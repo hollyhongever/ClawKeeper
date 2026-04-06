@@ -21,6 +21,7 @@ describe("service environment", () => {
           ...process.env,
           NVIDIA_API_KEY: "",
           TELEGRAM_BOT_TOKEN: "",
+          NEMOCLAW_DISABLE_MONITOR: "1",
           SANDBOX_NAME: "test-box",
           TMPDIR: workspace,
         },
@@ -39,6 +40,7 @@ describe("service environment", () => {
           ...process.env,
           NVIDIA_API_KEY: "",
           TELEGRAM_BOT_TOKEN: "test-token",
+          NEMOCLAW_DISABLE_MONITOR: "1",
           SANDBOX_NAME: "test-box",
           TMPDIR: workspace,
         },
@@ -46,7 +48,24 @@ describe("service environment", () => {
 
       expect(result).not.toContain("NVIDIA_API_KEY required");
       expect(result).toContain("NVIDIA_API_KEY not set");
-      expect(result).toContain("Telegram:    not started (no token)");
+      expect(result).toContain("Telegram:    not started (missing API key)");
+    });
+
+    it("enables NODE_USE_ENV_PROXY when proxy variables are present", () => {
+      const result = execSync(
+        'bash -c \'if [ -n "${HTTP_PROXY:-}${HTTPS_PROXY:-}${http_proxy:-}${https_proxy:-}${ALL_PROXY:-}${all_proxy:-}" ] && [ -z "${NODE_USE_ENV_PROXY:-}" ]; then export NODE_USE_ENV_PROXY=1; fi; echo "${NODE_USE_ENV_PROXY:-unset}"\'',
+        {
+          encoding: "utf-8",
+          env: {
+            ...process.env,
+            HTTP_PROXY: "http://127.0.0.1:7890",
+            HTTPS_PROXY: "http://127.0.0.1:7890",
+            NODE_USE_ENV_PROXY: "",
+          },
+        },
+      ).trim();
+
+      expect(result).toBe("1");
     });
   });
 
@@ -187,6 +206,7 @@ describe("service environment", () => {
           `export SANDBOX_NAME="test-box"`,
           `export TELEGRAM_BOT_TOKEN="test-token"`,
           `export NVIDIA_API_KEY="test-key"`,
+          `export NEMOCLAW_DISABLE_MONITOR="1"`,
           `export ALLOWED_CHAT_IDS="111,222,333"`,
           // Stub openshell (prints "Ready" to pass sandbox check) and hide cloudflared
           `BIN_DIR="${workspace}/bin"`,
@@ -266,6 +286,7 @@ describe("service environment", () => {
           `export SANDBOX_NAME="test-box"`,
           `export TELEGRAM_BOT_TOKEN="test-token"`,
           `export NVIDIA_API_KEY="test-key"`,
+          `export NEMOCLAW_DISABLE_MONITOR="1"`,
           `export ALLOWED_CHAT_IDS="111, 222 , 333"`,
           // Stub openshell (prints "Ready" to pass sandbox check) and hide cloudflared
           `BIN_DIR="${workspace}/bin"`,

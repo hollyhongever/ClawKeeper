@@ -17,10 +17,12 @@
  */
 
 const https = require("https");
+const path = require("path");
 const { execFileSync, spawn } = require("child_process");
 const { resolveOpenshell } = require("../bin/lib/resolve-openshell");
 const { shellQuote, validateName } = require("../bin/lib/runner");
 const { parseAllowedChatIds, isChatAllowed } = require("../bin/lib/chat-filter");
+const { appendServiceEvent } = require("../dist/lib/service-events");
 
 const OPENSHELL = resolveOpenshell();
 if (!OPENSHELL) {
@@ -31,6 +33,8 @@ if (!OPENSHELL) {
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const API_KEY = process.env.NVIDIA_API_KEY;
 const SANDBOX = process.env.SANDBOX_NAME || "nemoclaw";
+const PID_DIR =
+  process.env.NEMOCLAW_PID_DIR || path.join("/tmp", `nemoclaw-services-${SANDBOX}`);
 try { validateName(SANDBOX, "SANDBOX_NAME"); } catch (e) { console.error(e.message); process.exit(1); }
 const ALLOWED_CHATS = parseAllowedChatIds(process.env.ALLOWED_CHAT_IDS);
 
@@ -43,6 +47,21 @@ const activeSessions = new Map(); // chatId → message history
 const COOLDOWN_MS = 5000;
 const lastMessageTime = new Map();
 const busyChats = new Set();
+let lastPollError = { message: "", at: 0 };
+
+function recordBridgeEvent(level, title, detail) {
+  try {
+    appendServiceEvent(PID_DIR, {
+      level,
+      source: "telegram-bridge",
+      title,
+      detail,
+      service: "telegram-bridge",
+    });
+  } catch {
+    // Event logging is best-effort; bridge behavior should not depend on it.
+  }
+}
 
 // ── Telegram API helpers ──────────────────────────────────────────
 
@@ -145,6 +164,11 @@ function runAgentInSandbox(message, sessionId) {
       if (response) {
         resolve(response);
       } else if (code !== 0) {
+        recordBridgeEvent(
+          "error",
+          "Agent invocation failed",
+          `${stderr.trim().slice(0, 500) || "No stderr output"} (exit ${code})`,
+        );
         resolve(`Agent exited with code ${code}. ${stderr.trim().slice(0, 500)}`);
       } else {
         resolve("(no response)");
@@ -152,6 +176,7 @@ function runAgentInSandbox(message, sessionId) {
     });
 
     proc.on("error", (err) => {
+      recordBridgeEvent("error", "Agent invocation errored", err.message);
       resolve(`Error: ${err.message}`);
     });
   });
@@ -240,6 +265,11 @@ async function poll() {
     }
   } catch (err) {
     console.error("Poll error:", err.message);
+    const now = Date.now();
+    if (err.message !== lastPollError.message || now - lastPollError.at >= 60000) {
+      recordBridgeEvent("error", "Telegram polling failed", err.message);
+      lastPollError = { message: err.message, at: now };
+    }
   }
 
   // Continue polling (1s floor prevents tight-loop resource waste)
@@ -251,9 +281,20 @@ async function poll() {
 async function main() {
   const me = await tgApi("getMe", {});
   if (!me.ok) {
+    recordBridgeEvent(
+      "error",
+      "Telegram bridge failed to connect",
+      JSON.stringify(me).slice(0, 500),
+    );
     console.error("Failed to connect to Telegram:", JSON.stringify(me));
     process.exit(1);
   }
+
+  recordBridgeEvent(
+    "info",
+    "Telegram bridge connected",
+    `Bot @${me.result.username} -> sandbox ${SANDBOX}`,
+  );
 
   console.log("");
   console.log("  ┌─────────────────────────────────────────────────────┐");
@@ -271,5 +312,15 @@ async function main() {
 
   poll();
 }
+
+process.on("SIGINT", () => {
+  recordBridgeEvent("info", "Telegram bridge stopped", `Sandbox ${SANDBOX}`);
+  process.exit(0);
+});
+
+process.on("SIGTERM", () => {
+  recordBridgeEvent("info", "Telegram bridge stopped", `Sandbox ${SANDBOX}`);
+  process.exit(0);
+});
 
 main();

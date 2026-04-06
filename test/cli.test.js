@@ -68,6 +68,64 @@ describe("CLI dispatch", () => {
     expect(r.out.includes("No sandboxes")).toBeTruthy();
   });
 
+  it("status --json returns service snapshot data", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-status-json-"));
+    const registryDir = path.join(home, ".nemoclaw");
+    const sandboxName = `alpha-${Date.now()}`;
+    const pidDir = path.join(os.tmpdir(), `nemoclaw-services-${sandboxName}`);
+    fs.mkdirSync(registryDir, { recursive: true });
+    fs.mkdirSync(pidDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(registryDir, "sandboxes.json"),
+      JSON.stringify({
+        sandboxes: {
+          [sandboxName]: {
+            name: sandboxName,
+            model: "test-model",
+            provider: "nvidia-prod",
+            gpuEnabled: false,
+            policies: ["npm"],
+          },
+        },
+        defaultSandbox: sandboxName,
+      }),
+      { mode: 0o600 },
+    );
+    fs.writeFileSync(path.join(pidDir, "telegram-bridge.pid"), String(process.pid));
+    fs.writeFileSync(path.join(pidDir, "cloudflared.pid"), String(process.pid));
+    fs.writeFileSync(
+      path.join(pidDir, "cloudflared.log"),
+      "https://demo-status.trycloudflare.com",
+    );
+    fs.writeFileSync(
+      path.join(pidDir, "events.jsonl"),
+      `${JSON.stringify({
+        id: "evt-1",
+        timestamp: "2026-04-06T14:30:00.000Z",
+        level: "info",
+        source: "test",
+        title: "telegram-bridge started",
+        detail: "PID 123",
+        service: "telegram-bridge",
+      })}\n`,
+    );
+
+    const r = runWithEnv("status --json", { HOME: home });
+    expect(r.code).toBe(0);
+
+    const payload = JSON.parse(r.out);
+    expect(payload.defaultSandbox).toBe(sandboxName);
+    expect(payload.services.tunnelUrl).toBe("https://demo-status.trycloudflare.com");
+    expect(payload.services.services).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "service-monitor" }),
+        expect.objectContaining({ name: "telegram-bridge", running: true }),
+        expect.objectContaining({ name: "cloudflared", running: true }),
+      ]),
+    );
+    expect(payload.services.events[0]?.title).toBe("telegram-bridge started");
+  });
+
   it("start does not prompt for NVIDIA_API_KEY before launching local services", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-start-no-key-"));
     const localBin = path.join(home, "bin");

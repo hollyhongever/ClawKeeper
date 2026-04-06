@@ -97,7 +97,7 @@ stop_service() {
 show_status() {
   mkdir -p "$PIDDIR"
   echo ""
-  for svc in telegram-bridge cloudflared; do
+  for svc in service-monitor telegram-bridge cloudflared; do
     if is_running "$svc"; then
       echo -e "  ${GREEN}●${NC} $svc  (PID $(cat "$PIDDIR/$svc.pid"))"
     else
@@ -117,12 +117,16 @@ show_status() {
 
 do_stop() {
   mkdir -p "$PIDDIR"
+  stop_service service-monitor
   stop_service cloudflared
   stop_service telegram-bridge
   info "All services stopped."
 }
 
 do_start() {
+  local monitor_since
+  monitor_since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
   if [ -z "${TELEGRAM_BOT_TOKEN:-}" ]; then
     warn "TELEGRAM_BOT_TOKEN not set — Telegram bridge will not start."
     warn "Create a bot via @BotFather on Telegram and set the token."
@@ -140,6 +144,11 @@ do_start() {
   if [ -n "${WSL_DISTRO_NAME:-}" ] || [ -n "${WSL_INTEROP:-}" ] || grep -qi microsoft /proc/version 2>/dev/null; then
     export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--dns-result-order=ipv4first"
     info "WSL2 detected — setting --dns-result-order=ipv4first for Node.js bridge processes"
+  fi
+
+  if [ -n "${HTTP_PROXY:-}${HTTPS_PROXY:-}${http_proxy:-}${https_proxy:-}${ALL_PROXY:-}${all_proxy:-}" ] && [ -z "${NODE_USE_ENV_PROXY:-}" ]; then
+    export NODE_USE_ENV_PROXY=1
+    info "Proxy detected — enabling NODE_USE_ENV_PROXY for Node.js bridge processes"
   fi
 
   # Verify sandbox is running
@@ -163,6 +172,14 @@ do_start() {
       cloudflared tunnel --url "http://localhost:$DASHBOARD_PORT"
   else
     warn "cloudflared not found — no public URL. Install: brev-setup.sh or manually."
+  fi
+
+  if [ "${NEMOCLAW_DISABLE_MONITOR:-0}" != "1" ] && [ -n "${TELEGRAM_BOT_TOKEN:-}${NEMOCLAW_ENABLE_MONITOR:-}" ]; then
+    SANDBOX_NAME="$SANDBOX_NAME" \
+      NEMOCLAW_PID_DIR="$PIDDIR" \
+      NEMOCLAW_NOTIFY_AFTER="$monitor_since" \
+      start_service service-monitor \
+      node "$REPO_DIR/scripts/service-monitor.js"
   fi
 
   # Wait for cloudflared to publish URL
@@ -193,10 +210,20 @@ do_start() {
     printf "  │  Public URL:  %-40s│\n" "$tunnel_url"
   fi
 
+  if is_running service-monitor; then
+    echo "  │  Monitor:     event monitor running                 │"
+  else
+    echo "  │  Monitor:     not started                           │"
+  fi
+
   if is_running telegram-bridge; then
     echo "  │  Telegram:    bridge running                        │"
-  else
+  elif [ -z "${TELEGRAM_BOT_TOKEN:-}" ]; then
     echo "  │  Telegram:    not started (no token)                │"
+  elif [ -z "${NVIDIA_API_KEY:-}" ]; then
+    echo "  │  Telegram:    not started (missing API key)         │"
+  else
+    echo "  │  Telegram:    stopped                               │"
   fi
 
   echo "  │                                                     │"

@@ -13,6 +13,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { platform } from "node:os";
+import { appendServiceEvent, readServiceEvents, type ServiceEvent } from "./service-events";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,6 +36,14 @@ export interface ServiceStatus {
   pid: number | null;
 }
 
+export interface ServiceSnapshot {
+  sandboxName: string;
+  pidDir: string;
+  tunnelUrl: string | null;
+  services: ServiceStatus[];
+  events: ServiceEvent[];
+}
+
 // ---------------------------------------------------------------------------
 // Colour helpers — respect NO_COLOR
 // ---------------------------------------------------------------------------
@@ -51,6 +60,17 @@ function info(msg: string): void {
 
 function warn(msg: string): void {
   console.log(`${YELLOW}[services]${NC} ${msg}`);
+}
+
+function hasProxyEnv(env: NodeJS.ProcessEnv = process.env): boolean {
+  return !!(
+    env.HTTP_PROXY ||
+    env.HTTPS_PROXY ||
+    env.ALL_PROXY ||
+    env.http_proxy ||
+    env.https_proxy ||
+    env.all_proxy
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -101,8 +121,19 @@ function removePid(pidDir: string, name: string): void {
 // Service lifecycle
 // ---------------------------------------------------------------------------
 
-const SERVICE_NAMES = ["telegram-bridge", "cloudflared"] as const;
+const SERVICE_NAMES = ["service-monitor", "telegram-bridge", "cloudflared"] as const;
 type ServiceName = (typeof SERVICE_NAMES)[number];
+
+function readTunnelUrl(pidDir: string): string | null {
+  const logFile = join(pidDir, "cloudflared.log");
+  if (!isRunning(pidDir, "cloudflared") || !existsSync(logFile)) {
+    return null;
+  }
+
+  const log = readFileSync(logFile, "utf-8");
+  const match = /https:\/\/[a-z0-9-]*\.trycloudflare\.com/.exec(log);
+  return match ? match[0] : null;
+}
 
 function startService(
   pidDir: string,
@@ -141,6 +172,13 @@ function startService(
 
   subprocess.unref();
   writePid(pidDir, name, pid);
+  appendServiceEvent(pidDir, {
+    level: "info",
+    source: "services",
+    title: `${name} started`,
+    detail: `PID ${String(pid)}`,
+    service: name,
+  });
   info(`${name} started (PID ${String(pid)})`);
 }
 
@@ -188,6 +226,13 @@ function stopService(pidDir: string, name: ServiceName): void {
   }
 
   removePid(pidDir, name);
+  appendServiceEvent(pidDir, {
+    level: "info",
+    source: "services",
+    title: `${name} stopped`,
+    detail: `PID ${String(pid)}`,
+    service: name,
+  });
   info(`${name} stopped (PID ${String(pid)})`);
 }
 
@@ -212,35 +257,66 @@ function resolvePidDir(opts: ServiceOptions): string {
   return opts.pidDir ?? `/tmp/nemoclaw-services-${sandbox}`;
 }
 
-export function showStatus(opts: ServiceOptions = {}): void {
+function resolveSandboxName(opts: ServiceOptions): string {
+  return validateSandboxName(
+    opts.sandboxName ?? process.env.NEMOCLAW_SANDBOX ?? process.env.SANDBOX_NAME ?? "default",
+  );
+}
+
+function renderEvent(event: ServiceEvent): string[] {
+  const header = `  ${event.timestamp}  ${event.level.toUpperCase().padEnd(5)}  ${event.title}`;
+  if (!event.detail) {
+    return [header];
+  }
+  return [header, `    ${event.detail}`];
+}
+
+export function getServiceSnapshot(opts: ServiceOptions = {}): ServiceSnapshot {
   const pidDir = resolvePidDir(opts);
+  const sandboxName = resolveSandboxName(opts);
   ensurePidDir(pidDir);
 
+  return {
+    sandboxName,
+    pidDir,
+    tunnelUrl: readTunnelUrl(pidDir),
+    services: getServiceStatuses(opts),
+    events: readServiceEvents(pidDir, 8),
+  };
+}
+
+export function showStatus(opts: ServiceOptions = {}): void {
+  const snapshot = getServiceSnapshot(opts);
+
   console.log("");
-  for (const svc of SERVICE_NAMES) {
-    if (isRunning(pidDir, svc)) {
-      const pid = readPid(pidDir, svc);
-      console.log(`  ${GREEN}●${NC} ${svc}  (PID ${String(pid)})`);
+  for (const svc of snapshot.services) {
+    if (svc.running) {
+      console.log(`  ${GREEN}●${NC} ${svc.name}  (PID ${String(svc.pid)})`);
     } else {
-      console.log(`  ${RED}●${NC} ${svc}  (stopped)`);
+      console.log(`  ${RED}●${NC} ${svc.name}  (stopped)`);
     }
   }
   console.log("");
 
-  // Only show tunnel URL if cloudflared is actually running
-  const logFile = join(pidDir, "cloudflared.log");
-  if (isRunning(pidDir, "cloudflared") && existsSync(logFile)) {
-    const log = readFileSync(logFile, "utf-8");
-    const match = /https:\/\/[a-z0-9-]*\.trycloudflare\.com/.exec(log);
-    if (match) {
-      info(`Public URL: ${match[0]}`);
+  if (snapshot.tunnelUrl) {
+    info(`Public URL: ${snapshot.tunnelUrl}`);
+  }
+
+  if (snapshot.events.length > 0) {
+    console.log("  Recent events:");
+    for (const event of snapshot.events) {
+      for (const line of renderEvent(event)) {
+        console.log(line);
+      }
     }
+    console.log("");
   }
 }
 
 export function stopAll(opts: ServiceOptions = {}): void {
   const pidDir = resolvePidDir(opts);
   ensurePidDir(pidDir);
+  stopService(pidDir, "service-monitor");
   stopService(pidDir, "cloudflared");
   stopService(pidDir, "telegram-bridge");
   info("All services stopped.");
@@ -248,16 +324,32 @@ export function stopAll(opts: ServiceOptions = {}): void {
 
 export async function startAll(opts: ServiceOptions = {}): Promise<void> {
   const pidDir = resolvePidDir(opts);
+  const sandboxName = resolveSandboxName(opts);
   const dashboardPort = opts.dashboardPort ?? (Number(process.env.DASHBOARD_PORT) || 18789);
   // Compiled location: dist/lib/services.js → repo root is 2 levels up
   const repoDir = opts.repoDir ?? join(__dirname, "..", "..");
+  const monitorSince = new Date().toISOString();
 
   if (!process.env.TELEGRAM_BOT_TOKEN) {
     warn("TELEGRAM_BOT_TOKEN not set — Telegram bridge will not start.");
     warn("Create a bot via @BotFather on Telegram and set the token.");
+    appendServiceEvent(pidDir, {
+      level: "warn",
+      source: "services",
+      title: "Telegram bridge not started",
+      detail: "TELEGRAM_BOT_TOKEN not set",
+      service: "telegram-bridge",
+    });
   } else if (!process.env.NVIDIA_API_KEY) {
     warn("NVIDIA_API_KEY not set — Telegram bridge will not start.");
     warn("Set NVIDIA_API_KEY if you want Telegram requests to reach inference.");
+    appendServiceEvent(pidDir, {
+      level: "warn",
+      source: "services",
+      title: "Telegram bridge not started",
+      detail: "NVIDIA_API_KEY not set",
+      service: "telegram-bridge",
+    });
   }
 
   // Warn if no sandbox is ready
@@ -268,6 +360,13 @@ export async function startAll(opts: ServiceOptions = {}): Promise<void> {
     });
     if (!output.includes("Ready")) {
       warn("No sandbox in Ready state. Telegram bridge may not work until sandbox is running.");
+      appendServiceEvent(pidDir, {
+        level: "warn",
+        source: "services",
+        title: "No sandbox in Ready state",
+        detail: `Target sandbox ${sandboxName}`,
+        service: "telegram-bridge",
+      });
     }
   } catch {
     /* openshell not installed or no ready sandbox — skip check */
@@ -289,10 +388,13 @@ export async function startAll(opts: ServiceOptions = {}): Promise<void> {
     }
   }
 
+  if (hasProxyEnv() && !process.env.NODE_USE_ENV_PROXY) {
+    process.env.NODE_USE_ENV_PROXY = "1";
+    info("Proxy detected — enabling NODE_USE_ENV_PROXY for Node.js bridge processes");
+  }
+
   // Telegram bridge (only if both token and API key are set)
   if (process.env.TELEGRAM_BOT_TOKEN && process.env.NVIDIA_API_KEY) {
-    const sandboxName =
-      opts.sandboxName ?? process.env.NEMOCLAW_SANDBOX ?? process.env.SANDBOX_NAME ?? "default";
     startService(
       pidDir,
       "telegram-bridge",
@@ -314,6 +416,30 @@ export async function startAll(opts: ServiceOptions = {}): Promise<void> {
     ]);
   } catch {
     warn("cloudflared not found — no public URL. Install: brev-setup.sh or manually.");
+    appendServiceEvent(pidDir, {
+      level: "warn",
+      source: "services",
+      title: "cloudflared not available",
+      detail: "Install cloudflared to expose a public URL",
+      service: "cloudflared",
+    });
+  }
+
+  if (
+    process.env.NEMOCLAW_DISABLE_MONITOR !== "1" &&
+    (process.env.TELEGRAM_BOT_TOKEN || process.env.NEMOCLAW_ENABLE_MONITOR === "1")
+  ) {
+    startService(
+      pidDir,
+      "service-monitor",
+      "node",
+      [join(repoDir, "scripts", "service-monitor.js")],
+      {
+        SANDBOX_NAME: sandboxName,
+        NEMOCLAW_PID_DIR: pidDir,
+        NEMOCLAW_NOTIFY_AFTER: monitorSince,
+      },
+    );
   }
 
   // Wait for cloudflared URL
@@ -353,10 +479,20 @@ export async function startAll(opts: ServiceOptions = {}): Promise<void> {
     console.log(`  │  Public URL:  ${tunnelUrl.padEnd(40)}│`);
   }
 
+  if (isRunning(pidDir, "service-monitor")) {
+    console.log("  │  Monitor:     event monitor running                 │");
+  } else {
+    console.log("  │  Monitor:     not started                           │");
+  }
+
   if (isRunning(pidDir, "telegram-bridge")) {
     console.log("  │  Telegram:    bridge running                        │");
-  } else {
+  } else if (!process.env.TELEGRAM_BOT_TOKEN) {
     console.log("  │  Telegram:    not started (no token)                │");
+  } else if (!process.env.NVIDIA_API_KEY) {
+    console.log("  │  Telegram:    not started (missing API key)         │");
+  } else {
+    console.log("  │  Telegram:    stopped                               │");
   }
 
   console.log("  │                                                     │");

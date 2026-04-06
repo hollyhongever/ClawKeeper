@@ -8,10 +8,12 @@ import { tmpdir } from "node:os";
 
 // Import from compiled dist/ so coverage is attributed correctly.
 import {
+  getServiceSnapshot,
   getServiceStatuses,
   showStatus,
   stopAll,
 } from "../../dist/lib/services";
+import { appendServiceEvent } from "../../dist/lib/service-events";
 
 describe("getServiceStatuses", () => {
   let pidDir: string;
@@ -26,7 +28,7 @@ describe("getServiceStatuses", () => {
 
   it("returns stopped status when no PID files exist", () => {
     const statuses = getServiceStatuses({ pidDir });
-    expect(statuses).toHaveLength(2);
+    expect(statuses).toHaveLength(3);
     for (const s of statuses) {
       expect(s.running).toBe(false);
       expect(s.pid).toBeNull();
@@ -36,6 +38,7 @@ describe("getServiceStatuses", () => {
   it("returns service names telegram-bridge and cloudflared", () => {
     const statuses = getServiceStatuses({ pidDir });
     const names = statuses.map((s) => s.name);
+    expect(names).toContain("service-monitor");
     expect(names).toContain("telegram-bridge");
     expect(names).toContain("cloudflared");
   });
@@ -62,7 +65,39 @@ describe("getServiceStatuses", () => {
     const nested = join(pidDir, "nested", "deep");
     const statuses = getServiceStatuses({ pidDir: nested });
     expect(existsSync(nested)).toBe(true);
-    expect(statuses).toHaveLength(2);
+    expect(statuses).toHaveLength(3);
+  });
+});
+
+describe("getServiceSnapshot", () => {
+  let pidDir: string;
+
+  beforeEach(() => {
+    pidDir = mkdtempSync(join(tmpdir(), "nemoclaw-svc-snapshot-"));
+  });
+
+  afterEach(() => {
+    rmSync(pidDir, { recursive: true, force: true });
+  });
+
+  it("returns recent events and tunnel URL", () => {
+    appendServiceEvent(pidDir, {
+      level: "warn",
+      source: "test",
+      title: "telegram-bridge failed",
+      detail: "Timed out",
+      timestamp: "2026-04-06T14:20:00.000Z",
+      service: "telegram-bridge",
+    });
+    writeFileSync(join(pidDir, "cloudflared.log"), "https://abc-def.trycloudflare.com");
+    writeFileSync(join(pidDir, "cloudflared.pid"), String(process.pid));
+
+    const snapshot = getServiceSnapshot({ pidDir, sandboxName: "alpha" });
+
+    expect(snapshot.sandboxName).toBe("alpha");
+    expect(snapshot.tunnelUrl).toBe("https://abc-def.trycloudflare.com");
+    expect(snapshot.events[0]?.title).toBe("telegram-bridge failed");
+    expect(snapshot.services).toHaveLength(3);
   });
 });
 
@@ -99,6 +134,7 @@ describe("showStatus", () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     showStatus({ pidDir });
     const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain("service-monitor");
     expect(output).toContain("telegram-bridge");
     expect(output).toContain("cloudflared");
     expect(output).toContain("stopped");
@@ -118,6 +154,25 @@ describe("showStatus", () => {
     const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
     // Should NOT show the URL since cloudflared is not actually running
     expect(output).not.toContain("Public URL");
+    logSpy.mockRestore();
+  });
+
+  it("renders recent events", () => {
+    appendServiceEvent(pidDir, {
+      level: "error",
+      source: "test",
+      title: "cloudflared stopped unexpectedly",
+      detail: "Last known PID 1234",
+      timestamp: "2026-04-06T14:21:00.000Z",
+      service: "cloudflared",
+    });
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    showStatus({ pidDir });
+    const output = logSpy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain("Recent events:");
+    expect(output).toContain("cloudflared stopped unexpectedly");
+    expect(output).toContain("Last known PID 1234");
     logSpy.mockRestore();
   });
 });

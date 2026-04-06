@@ -1074,18 +1074,43 @@ function uninstall(args) {
   exitWithSpawnResult(result);
 }
 
-function showStatus() {
+function showStatus(args = []) {
   // Show sandbox registry
   const { sandboxes, defaultSandbox } = registry.listSandboxes();
-  if (sandboxes.length > 0) {
-    const live = parseGatewayInference(
-      captureOpenshell(["inference", "get"], { ignoreError: true }).output,
+  const live = sandboxes.length
+    ? parseGatewayInference(captureOpenshell(["inference", "get"], { ignoreError: true }).output)
+    : null;
+  const sandboxSummaries = sandboxes.map((sb) => ({
+    name: sb.name,
+    default: sb.name === defaultSandbox,
+    model: (live && live.model) || sb.model || null,
+    provider: (live && live.provider) || sb.provider || null,
+    gpuEnabled: !!sb.gpuEnabled,
+    policies: sb.policies || [],
+  }));
+
+  if (args.includes("--json")) {
+    const { getServiceSnapshot } = require("./lib/services");
+    console.log(
+      JSON.stringify(
+        {
+          sandboxes: sandboxSummaries,
+          defaultSandbox,
+          services: getServiceSnapshot({ sandboxName: defaultSandbox || undefined }),
+        },
+        null,
+        2,
+      ),
     );
+    return;
+  }
+
+  if (sandboxes.length > 0) {
     console.log("");
     console.log("  Sandboxes:");
-    for (const sb of sandboxes) {
-      const def = sb.name === defaultSandbox ? " *" : "";
-      const model = (live && live.model) || sb.model;
+    for (const sb of sandboxSummaries) {
+      const def = sb.default ? " *" : "";
+      const model = sb.model;
       console.log(`    ${sb.name}${def}${model ? ` (${model})` : ""}`);
     }
     console.log("");
@@ -1706,7 +1731,7 @@ const [cmd, ...args] = process.argv.slice(2);
         stop();
         break;
       case "status":
-        showStatus();
+        showStatus(args);
         break;
       case "debug":
         debug(args);

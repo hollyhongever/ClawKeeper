@@ -230,8 +230,10 @@ We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for development
 
 ## Security
 
-If you discover a vulnerability in ClawKeeper, **do not open a public issue**.
-Use the private reporting workflow described in [SECURITY.md](SECURITY.md).
+If you discover a ClawKeeper-specific security issue, follow the guidance in [SECURITY.md](SECURITY.md).
+
+For high-risk vulnerabilities such as credential exposure, authentication bypass, sandbox escape, remote code execution, or clear data-exfiltration paths, prefer private reporting first.
+For lower-risk hardening gaps, detection misses, non-sensitive misconfigurations, or security improvement suggestions, opening a public GitHub issue is acceptable as long as you do not include secrets or weaponized exploit details.
 
 If the issue appears to originate in upstream OpenShell, NemoClaw, or another dependency rather than ClawKeeper-specific code, coordinate disclosure with the upstream project or vendor as well.
 

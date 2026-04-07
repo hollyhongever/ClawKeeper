@@ -16,7 +16,7 @@ const PID_DIR =
   process.env.NEMOCLAW_PID_DIR || path.join("/tmp", `nemoclaw-services-${SANDBOX}`);
 const EVENT_LOG = process.env.NEMOCLAW_EVENT_LOG || resolveServiceEventLogPath(PID_DIR);
 const POLL_MS = Math.max(2000, Number.parseInt(process.env.NEMOCLAW_MONITOR_POLL_MS || "4000", 10));
-const MONITORED_SERVICES = ["telegram-bridge", "cloudflared"];
+const MONITORED_SERVICES = ["runtime-watchdog", "telegram-bridge", "cloudflared"];
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const PUSH_CHAT_IDS =
   parseAllowedChatIds(process.env.TELEGRAM_PUSH_CHAT_IDS) ||

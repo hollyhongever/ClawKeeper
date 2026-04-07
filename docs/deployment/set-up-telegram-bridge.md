@@ -25,7 +25,7 @@ status: published
 Use one Telegram bot to do both of the following:
 
 - Chat with the OpenClaw agent running inside the sandbox.
-- Receive service-event push notifications when the bridge, tunnel, or monitor reports a problem.
+- Receive service-event push notifications when the bridge, tunnel, monitor, or runtime watchdog reports a problem.
 
 This workflow is managed by `clawkeeper start` or `nemoclaw start`.
 
@@ -42,13 +42,14 @@ The current host-side Telegram bridge requires both `TELEGRAM_BOT_TOKEN` and `NV
 
 ## Components and Data Flow
 
-The Telegram integration has five moving parts:
+The Telegram integration has six moving parts:
 
 1. `clawkeeper` or `nemoclaw` runs on the host and starts auxiliary services.
 2. `telegram-bridge` polls the Telegram Bot API.
 3. `openshell` provides SSH access into the selected sandbox.
 4. `nemoclaw-start openclaw agent` runs inside the sandbox and produces the reply.
-5. `service-monitor` watches the bridge and tunnel, writes structured events, and optionally pushes those events back to Telegram.
+5. `runtime-watchdog` runs read-only monitoring probes and appends runtime findings to the shared service-event log.
+6. `service-monitor` watches auxiliary services, tails the shared event log, and optionally pushes those events back to Telegram.
 
 In practice, the request path looks like this:
 
@@ -75,10 +76,16 @@ Use the following environment variables when you start the services:
 | `HTTP_PROXY` and `HTTPS_PROXY` | Optional | Required when the host can reach Telegram only through a local or corporate proxy. |
 | `NEMOCLAW_ENABLE_MONITOR` | Optional | Forces `service-monitor` to start even if chat is not enabled. |
 | `NEMOCLAW_DISABLE_MONITOR` | Optional | Disables `service-monitor`. |
+| `NEMOCLAW_WATCHDOG_POLL_MS` | Optional | Overrides how often `runtime-watchdog` runs status probes. |
 
 :::{important}
 Environment variables are read by the shell that launches `clawkeeper start`.
 If you export a variable in one terminal and start ClawKeeper from another terminal, the second terminal does not inherit that value.
+:::
+
+:::{note}
+The runtime watchdog also supports the monitor module's read-only probe overrides, such as `CLAW_OPENSHELL_BIN`, `CLAW_NEMOCLAW_BIN`, `CLAW_DOCKER_BIN`, `CLAW_OPENSHELL_CONTAINER`, and SSH-based read-only collector variables.
+Use them when your local or remote NemoClaw layout differs from the defaults.
 :::
 
 ## Verify Network Reachability
@@ -144,6 +151,7 @@ $ clawkeeper start
 The `start` command launches the following services:
 
 - The Telegram bridge forwards messages between Telegram and the agent.
+- The runtime watchdog runs periodic status probes and writes watchdog findings into `events.jsonl`.
 - The service monitor writes structured service events and optionally pushes them to Telegram.
 - The cloudflared tunnel provides external access to the sandbox when `cloudflared` is installed.
 
@@ -159,9 +167,9 @@ $ clawkeeper status
 
 The terminal view shows the following information:
 
-- Running or stopped state for `service-monitor`, `telegram-bridge`, and `cloudflared`
+- Running or stopped state for `runtime-watchdog`, `service-monitor`, `telegram-bridge`, and `cloudflared`
 - Public tunnel URL when available
-- Recent structured events such as bridge startup, bridge failures, tunnel changes, and manual test events
+- Recent structured events such as bridge startup, watchdog alerts, tunnel changes, and manual test events
 
 For machine-readable output, use:
 
@@ -218,6 +226,8 @@ Service state is stored under `/tmp/nemoclaw-services-<sandbox-name>`.
 The most useful files are:
 
 - `events.jsonl` for structured events
+- `runtime-watchdog.log` for watchdog probe output
+- `runtime-watchdog-state.json` for the watchdog's active-issue dedupe state
 - `telegram-bridge.log` for bridge output
 - `service-monitor.log` for push-monitoring output
 - `cloudflared.log` for tunnel status
@@ -226,9 +236,17 @@ For example:
 
 ```console
 $ tail -f /tmp/nemoclaw-services-my-assistant/events.jsonl
+$ tail -f /tmp/nemoclaw-services-my-assistant/runtime-watchdog.log
 $ tail -f /tmp/nemoclaw-services-my-assistant/service-monitor.log
 $ tail -f /tmp/nemoclaw-services-my-assistant/telegram-bridge.log
 ```
+
+## Watchdog Event Flow
+
+When `runtime-watchdog` detects a degraded probe, onboarding issue, or repeated health failure, it appends a normalized event into `events.jsonl` with `source: "runtime-watchdog"` and `service: "runtime-watchdog"`.
+
+The existing `service-monitor` process does not need a special integration path for these events.
+It reads the same `events.jsonl` stream, then forwards new entries to Telegram when push notifications are enabled.
 
 ## Generate a Fake Event to Test Push Notifications
 

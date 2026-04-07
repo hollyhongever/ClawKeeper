@@ -97,7 +97,7 @@ stop_service() {
 show_status() {
   mkdir -p "$PIDDIR"
   echo ""
-  for svc in service-monitor telegram-bridge cloudflared; do
+  for svc in runtime-watchdog service-monitor telegram-bridge cloudflared; do
     if is_running "$svc"; then
       echo -e "  ${GREEN}●${NC} $svc  (PID $(cat "$PIDDIR/$svc.pid"))"
     else
@@ -117,6 +117,7 @@ show_status() {
 
 do_stop() {
   mkdir -p "$PIDDIR"
+  stop_service runtime-watchdog
   stop_service service-monitor
   stop_service cloudflared
   stop_service telegram-bridge
@@ -136,6 +137,9 @@ do_start() {
   fi
 
   command -v node >/dev/null || fail "node not found. Install Node.js first."
+  if ! command -v python3 >/dev/null 2>&1; then
+    warn "python3 not found — runtime watchdog will not start."
+  fi
 
   # WSL2 ships with broken IPv6 routing. Node.js resolves dual-stack DNS results
   # and tries IPv6 first (ENETUNREACH) then IPv4 (ETIMEDOUT), causing bridge
@@ -175,6 +179,13 @@ do_start() {
   fi
 
   if [ "${NEMOCLAW_DISABLE_MONITOR:-0}" != "1" ] && [ -n "${TELEGRAM_BOT_TOKEN:-}${NEMOCLAW_ENABLE_MONITOR:-}" ]; then
+    if command -v python3 >/dev/null 2>&1; then
+      SANDBOX_NAME="$SANDBOX_NAME" \
+        NEMOCLAW_PID_DIR="$PIDDIR" \
+        start_service runtime-watchdog \
+        python3 "$REPO_DIR/scripts/runtime-watchdog.py"
+    fi
+
     SANDBOX_NAME="$SANDBOX_NAME" \
       NEMOCLAW_PID_DIR="$PIDDIR" \
       NEMOCLAW_NOTIFY_AFTER="$monitor_since" \
@@ -208,6 +219,12 @@ do_start() {
 
   if [ -n "$tunnel_url" ]; then
     printf "  │  Public URL:  %-40s│\n" "$tunnel_url"
+  fi
+
+  if is_running runtime-watchdog; then
+    echo "  │  Watchdog:    runtime checks running                │"
+  else
+    echo "  │  Watchdog:    not started                           │"
   fi
 
   if is_running service-monitor; then

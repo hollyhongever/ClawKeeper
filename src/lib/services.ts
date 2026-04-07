@@ -121,8 +121,25 @@ function removePid(pidDir: string, name: string): void {
 // Service lifecycle
 // ---------------------------------------------------------------------------
 
-const SERVICE_NAMES = ["service-monitor", "telegram-bridge", "cloudflared"] as const;
+const SERVICE_NAMES = [
+  "runtime-watchdog",
+  "service-monitor",
+  "telegram-bridge",
+  "cloudflared",
+] as const;
 type ServiceName = (typeof SERVICE_NAMES)[number];
+
+function hasCommand(command: string): boolean {
+  try {
+    execSync(`command -v ${command}`, {
+      stdio: ["ignore", "ignore", "ignore"],
+      shell: "/bin/sh",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function readTunnelUrl(pidDir: string): string | null {
   const logFile = join(pidDir, "cloudflared.log");
@@ -316,6 +333,7 @@ export function showStatus(opts: ServiceOptions = {}): void {
 export function stopAll(opts: ServiceOptions = {}): void {
   const pidDir = resolvePidDir(opts);
   ensurePidDir(pidDir);
+  stopService(pidDir, "runtime-watchdog");
   stopService(pidDir, "service-monitor");
   stopService(pidDir, "cloudflared");
   stopService(pidDir, "telegram-bridge");
@@ -349,6 +367,17 @@ export async function startAll(opts: ServiceOptions = {}): Promise<void> {
       title: "Telegram bridge not started",
       detail: "NVIDIA_API_KEY not set",
       service: "telegram-bridge",
+    });
+  }
+
+  if (!hasCommand("python3")) {
+    warn("python3 not found — runtime watchdog will not start.");
+    appendServiceEvent(pidDir, {
+      level: "warn",
+      source: "services",
+      title: "Runtime watchdog not started",
+      detail: "python3 not found on PATH",
+      service: "runtime-watchdog",
     });
   }
 
@@ -429,6 +458,19 @@ export async function startAll(opts: ServiceOptions = {}): Promise<void> {
     process.env.NEMOCLAW_DISABLE_MONITOR !== "1" &&
     (process.env.TELEGRAM_BOT_TOKEN || process.env.NEMOCLAW_ENABLE_MONITOR === "1")
   ) {
+    if (hasCommand("python3")) {
+      startService(
+        pidDir,
+        "runtime-watchdog",
+        "python3",
+        [join(repoDir, "scripts", "runtime-watchdog.py")],
+        {
+          SANDBOX_NAME: sandboxName,
+          NEMOCLAW_PID_DIR: pidDir,
+        },
+      );
+    }
+
     startService(
       pidDir,
       "service-monitor",
@@ -477,6 +519,12 @@ export async function startAll(opts: ServiceOptions = {}): Promise<void> {
 
   if (tunnelUrl) {
     console.log(`  │  Public URL:  ${tunnelUrl.padEnd(40)}│`);
+  }
+
+  if (isRunning(pidDir, "runtime-watchdog")) {
+    console.log("  │  Watchdog:    runtime checks running                │");
+  } else {
+    console.log("  │  Watchdog:    not started                           │");
   }
 
   if (isRunning(pidDir, "service-monitor")) {

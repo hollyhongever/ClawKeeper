@@ -32,6 +32,7 @@ The MVP follows four layers:
 - `detectors/output_quality.py`: long output, repeated output, and truncation checks.
 - `detectors/probe_health.py`: turns probe failures and degraded statuses into health events.
 - `interface/monitor_service.py`: orchestrates collectors and detectors.
+- `interface/watchdog_bridge.py`: bridges monitoring findings into the shared service-event log used by push notifications.
 - `reporters/json_reporter.py`: machine-readable JSON output.
 - `reporters/summary_reporter.py`: short summary string for logs or notifications.
 - `reporters/health_reporter.py`: renders the structured health overview for dashboards and push systems.
@@ -40,9 +41,11 @@ The MVP follows four layers:
 - `tests/test_cli_collector.py`: parser and CLI collector tests for NemoClaw/OpenShell integration.
 - `tests/test_status_collector.py`: verifies one-shot status snapshots and health alerts.
 - `tests/test_ssh_runner.py`: verifies SSH runner command assembly and env-driven SSH config.
+- `tests/test_watchdog_bridge.py`: verifies event dedupe, recovery emission, and `events.jsonl` output.
 - `examples/run_mock_demo.py`: prints structured results for all mock scenarios.
 - `examples/run_nemoclaw_cli_demo.py`: example entrypoint for a live NemoClaw CLI run.
 - `examples/run_nemoclaw_status_demo.py`: example entrypoint for read-only local or remote status snapshots.
+- `scripts/runtime-watchdog.py`: host-side polling loop that runs status probes and writes normalized watchdog alerts.
 
 ## NemoClaw / OpenClaw Integration Path
 
@@ -105,6 +108,12 @@ This is still read-only: it only runs status, inspect, `kubectl get`, and file `
 - Use `NemoClawStatusCollector` for one-shot health snapshots, dashboards, or push notifications.
 - Use `NemoClawCLICollector` when you want to observe a long-running command stream and correlate it with the same probes.
 
+### Host-side notification bridge
+
+- `scripts/runtime-watchdog.py` periodically runs `NemoClawStatusCollector.from_env()` and passes the report to `WatchdogEventBridge`.
+- `WatchdogEventBridge` appends warning and error findings into `/tmp/nemoclaw-services-<sandbox>/events.jsonl`.
+- Existing host services such as `service-monitor` and the Telegram bridge can consume those events without any detector-specific integration.
+
 ## Implemented vs Not Yet Implemented
 
 Implemented:
@@ -115,13 +124,14 @@ Implemented:
 - structured event schema
 - JSON and summary output interfaces
 - structured health overview for snapshot and remote status mode
+- bridge from runtime findings into the existing host-side service-event notification pipeline
 - local mock testing and demo cases
 
 Not yet implemented:
 
 - semantic similarity for near-duplicate outputs
 - token-level accounting from real model traces
-- live streaming transport to frontend or push services
+- full live task-stream transport to frontend or push services
 - direct NemoClaw/OpenClaw runtime adapters
 - security-module correlation
 - semantic parsing for all real CLI output variants
@@ -135,6 +145,7 @@ python3 -m unittest monitor.tests.test_mock_cases
 python3 -m unittest monitor.tests.test_cli_collector
 python3 -m unittest monitor.tests.test_status_collector
 python3 -m unittest monitor.tests.test_ssh_runner
+python3 -m unittest monitor.tests.test_watchdog_bridge
 ```
 
 Run the local demo:

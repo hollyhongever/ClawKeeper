@@ -55,6 +55,7 @@ $ clawkeeper status
 ```
 
 This view includes the current state of the auxiliary services and the most recent structured service events.
+That includes the host-side `runtime-watchdog`, which appends monitoring findings into the same event stream used by Telegram push notifications.
 
 For machine-readable output, use:
 
@@ -63,6 +64,7 @@ $ clawkeeper status --json
 ```
 
 The structured event log is stored under `/tmp/nemoclaw-services-<sandbox-name>/events.jsonl`.
+If runtime monitoring is enabled, watchdog alerts are written there with `source: "runtime-watchdog"`.
 Refer to [Use the NemoClaw Telegram Bridge, Push Notifications, and Service Monitoring](../deployment/set-up-telegram-bridge.md) for the full host-side Telegram and service-monitor workflow.
 
 ## View Blueprint and Sandbox Logs

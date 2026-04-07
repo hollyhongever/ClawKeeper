@@ -28,7 +28,7 @@ describe("getServiceStatuses", () => {
 
   it("returns stopped status when no PID files exist", () => {
     const statuses = getServiceStatuses({ pidDir });
-    expect(statuses).toHaveLength(3);
+    expect(statuses).toHaveLength(4);
     for (const s of statuses) {
       expect(s.running).toBe(false);
       expect(s.pid).toBeNull();
@@ -38,6 +38,7 @@ describe("getServiceStatuses", () => {
   it("returns service names telegram-bridge and cloudflared", () => {
     const statuses = getServiceStatuses({ pidDir });
     const names = statuses.map((s) => s.name);
+    expect(names).toContain("runtime-watchdog");
     expect(names).toContain("service-monitor");
     expect(names).toContain("telegram-bridge");
     expect(names).toContain("cloudflared");
@@ -65,7 +66,7 @@ describe("getServiceStatuses", () => {
     const nested = join(pidDir, "nested", "deep");
     const statuses = getServiceStatuses({ pidDir: nested });
     expect(existsSync(nested)).toBe(true);
-    expect(statuses).toHaveLength(3);
+    expect(statuses).toHaveLength(4);
   });
 });
 
@@ -97,7 +98,7 @@ describe("getServiceSnapshot", () => {
     expect(snapshot.sandboxName).toBe("alpha");
     expect(snapshot.tunnelUrl).toBe("https://abc-def.trycloudflare.com");
     expect(snapshot.events[0]?.title).toBe("telegram-bridge failed");
-    expect(snapshot.services).toHaveLength(3);
+    expect(snapshot.services).toHaveLength(4);
   });
 });
 

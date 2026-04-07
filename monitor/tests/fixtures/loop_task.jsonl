@@ -1,0 +1,11 @@
+# Created by Codex for module 3 (work detection), date: 2026-04-04
+{"task_id":"demo-loop","timestamp":"2026-04-04T12:10:00+00:00","kind":"task_start","step":"investigate"}
+{"task_id":"demo-loop","timestamp":"2026-04-04T12:10:05+00:00","kind":"tool_call","step":"investigate","tool_name":"search_logs"}
+{"task_id":"demo-loop","timestamp":"2026-04-04T12:10:08+00:00","kind":"output","step":"investigate","content":"Searching logs for the root cause now."}
+{"task_id":"demo-loop","timestamp":"2026-04-04T12:10:12+00:00","kind":"tool_call","step":"investigate","tool_name":"search_logs"}
+{"task_id":"demo-loop","timestamp":"2026-04-04T12:10:15+00:00","kind":"output","step":"investigate","content":"Searching logs for the root cause now."}
+{"task_id":"demo-loop","timestamp":"2026-04-04T12:10:19+00:00","kind":"tool_call","step":"investigate","tool_name":"search_logs"}
+{"task_id":"demo-loop","timestamp":"2026-04-04T12:10:22+00:00","kind":"output","step":"investigate","content":"Searching logs for the root cause now."}
+{"task_id":"demo-loop","timestamp":"2026-04-04T12:10:25+00:00","kind":"output","step":"investigate","content":"Searching logs for the root cause now."}
+{"task_id":"demo-loop","timestamp":"2026-04-04T12:10:30+00:00","kind":"task_end","step":"investigate","status":"failed"}
+

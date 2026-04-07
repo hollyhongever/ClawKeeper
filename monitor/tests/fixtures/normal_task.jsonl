@@ -1,0 +1,8 @@
+# Created by Codex for module 3 (work detection), date: 2026-04-04
+{"task_id":"demo-normal","timestamp":"2026-04-04T12:00:00+00:00","kind":"task_start","step":"prepare"}
+{"task_id":"demo-normal","timestamp":"2026-04-04T12:00:05+00:00","kind":"output","step":"prepare","content":"Workspace loaded and input normalized."}
+{"task_id":"demo-normal","timestamp":"2026-04-04T12:00:10+00:00","kind":"tool_call","step":"scan_repo","tool_name":"rg"}
+{"task_id":"demo-normal","timestamp":"2026-04-04T12:00:16+00:00","kind":"output","step":"scan_repo","content":"Found 12 files related to deployment and monitoring."}
+{"task_id":"demo-normal","timestamp":"2026-04-04T12:00:28+00:00","kind":"summary","step":"build_report","content":"Repository scan completed and monitoring framework scaffolded successfully."}
+{"task_id":"demo-normal","timestamp":"2026-04-04T12:00:35+00:00","kind":"task_end","step":"build_report","status":"succeeded"}
+

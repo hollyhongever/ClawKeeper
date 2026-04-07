@@ -1,0 +1,7 @@
+# Created by Codex for module 3 (work detection), date: 2026-04-04
+{"task_id":"demo-timeout","timestamp":"2026-04-04T12:20:00+00:00","kind":"task_start","step":"bootstrap"}
+{"task_id":"demo-timeout","timestamp":"2026-04-04T12:20:10+00:00","kind":"output","step":"bootstrap","content":"Gateway bootstrap started."}
+{"task_id":"demo-timeout","timestamp":"2026-04-04T12:20:20+00:00","kind":"tool_call","step":"wait_gateway","tool_name":"openshell_status"}
+{"task_id":"demo-timeout","timestamp":"2026-04-04T12:24:40+00:00","kind":"output","step":"wait_gateway","content":"Still waiting for namespace readiness."}
+{"task_id":"demo-timeout","timestamp":"2026-04-04T12:26:10+00:00","kind":"task_end","step":"wait_gateway","status":"failed"}
+

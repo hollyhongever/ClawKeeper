@@ -13,6 +13,24 @@ It is an independent derivative project built on the NemoClaw and OpenShell foun
 ClawKeeper is Team ZJU001's entry for the inaugural China NVIDIA DGX Spark Hackathon.
 <!-- end-intro -->
 
+## Hackathon Highlights
+
+ClawKeeper is not presented as a single-feature patch.
+The project is intentionally framed as an operator-facing stack for **safe, observable, and governable agent execution**.
+
+Current highlights across the repository include:
+
+- Security Control Plane:
+  risk-aware tool interception, install admission, audit events, policy templates, credential hardening, and redaction.
+- Runtime Watchdog:
+  local-first work detection for timeout, stall, repeated-step, repeated-tool, repeated-output, and runtime-health anomalies.
+- Operator Feedback:
+  structured event outputs that can feed CLI status views, service monitoring, Telegram notifications, and future dashboards.
+- Deployment and Ops:
+  remote GPU deployment notes, DGX Spark setup experience, public exposure rollout guidance, and troubleshooting playbooks.
+
+This makes the project more compelling to evaluate as a product direction, because it addresses not just "can the agent run", but also "can operators understand, trust, and control the runtime".
+
 > **Early-stage software**
 >
 > ClawKeeper is experimental and not production-ready.
@@ -35,6 +53,8 @@ Repository guides for that positioning:
 - [NOTICE](NOTICE)
 - [Upstream Foundation and Attribution](UPSTREAM.md)
 - [ClawKeeper Roadmap](ROADMAP.md)
+- [Project Overview](docs/about/overview.md)
+- [How It Works](docs/about/how-it-works.md)
 
 ## Security Enhancements
 
@@ -47,13 +67,36 @@ ClawKeeper extends the base stack with a security module focused on operator vis
 - Password-first onboarding, encrypted credential storage, and safer public-exposure defaults.
 - Deterministic redaction, staged dangerous-command policy, and rollout playbooks for `audit`, `warn`, and `enforce` promotion.
 
+## Runtime Watchdog and Observability
+
+Beyond security, ClawKeeper now also includes an early **Runtime Watchdog** layer aimed at answering a practical operator question:
+
+**is the agent actually making progress, or only appearing busy?**
+
+The current monitoring work focuses on:
+
+- task lifecycle tracking and stage-aware summaries
+- timeout and stalled-task detection
+- repeated-step, repeated-tool, and repeated-output detection
+- runtime-health observation through OpenShell, Docker, sandbox, and cluster probes
+- normalized event emission for notifications, dashboards, and downstream integrations
+- local-first mock testing so the module can be developed and demoed without depending on a live remote cluster
+
+The watchdog implementation and monitoring documentation live here:
+
+- [Monitor Module README](monitor/README.md)
+- [Monitor Sandbox Activity](docs/monitoring/monitor-sandbox-activity.md)
+- [Telegram Bridge and Notifications](docs/deployment/set-up-telegram-bridge.md)
+- [Deploy to Remote GPU](docs/deployment/deploy-to-remote-gpu.md)
+- [DGX Spark Setup Guide](spark-install.md)
+
 ## Planned Expansion Beyond Security
 
 Security is the first major ClawKeeper-native layer, not the final one.
 The current roadmap also includes:
 
 - Runtime Watchdog:
-  dead-loop detection, token overconsumption checks, timeout or stalled-task detection, and abnormal run-state alerts.
+  expanding the current prototype toward deeper dead-loop detection, token overconsumption checks, timeout or stalled-task detection, and abnormal run-state alerts.
 - Operator Intelligence:
   proactive recommendations for useful skills, workflow improvements, and operator playbooks based on deployment posture and runtime signals.
 
@@ -184,6 +227,11 @@ Refer to the repository documentation for ClawKeeper-specific usage, architectur
 | [How It Works](docs/about/how-it-works.md) | Plugin, blueprint, sandbox lifecycle, and host-side control flow. |
 | [ClawKeeper Security Enhancement Plan](docs/security/clawkeeper-security-enhancement-plan.md) | Implementation blueprint for runtime interception, install admission, policy, and audit behavior. |
 | [Security Module Updates](docs/security/security-module-updates.md) | Changelog of landed security milestones and operator-facing changes. |
+| [Monitor Module README](monitor/README.md) | Module 3 design notes for work detection, collectors, detectors, events, tests, and NemoClaw integration path. |
+| [Monitor Sandbox Activity](docs/monitoring/monitor-sandbox-activity.md) | Operator-facing guide for observing sandbox health, runtime signals, and structured events. |
+| [Telegram Bridge and Notifications](docs/deployment/set-up-telegram-bridge.md) | Describes the host-side notification path, service monitor, and Telegram push workflow. |
+| [Deploy to Remote GPU](docs/deployment/deploy-to-remote-gpu.md) | Remote deployment path for GPU-backed environments and operator workflows. |
+| [DGX Spark Setup Guide](spark-install.md) | Practical deployment guide for NemoClaw / ClawKeeper on NVIDIA DGX Spark. |
 | [Public Exposure Rollout Playbook](docs/security/public-exposure-rollout-playbook.md) | Staged rollout guide for exposing hardened ClawKeeper deployments more safely. |
 | [CLI Commands](docs/reference/commands.md) | Full ClawKeeper CLI command reference. |
 | [Network Policies](docs/reference/network-policies.md) | Baseline rules, operator approval flow, and egress control. |
@@ -211,11 +259,24 @@ ClawKeeper/
 │       ├── commands/     # Slash commands, migration state
 │       ├── security/     # Risk engine, hooks, policies, audit types
 │       └── onboard/      # Onboarding config
+├── monitor/          # Runtime watchdog framework, collectors, detectors, reporters, examples, and tests
 ├── nemoclaw-blueprint/   # Blueprint YAML and network policies
 ├── scripts/          # Install helpers, setup, automation
 ├── test/             # Integration and E2E tests
 └── docs/             # User-facing docs, including security design and rollout guides
 ```
+
+## Demo Story
+
+For hackathon judges, the most important takeaway is that ClawKeeper tries to close the gap between **agent capability** and **agent operability**.
+The repository now shows work in several complementary directions:
+
+- making the runtime safer through policy and audit controls
+- making the runtime observable through watchdog monitoring and structured events
+- making the system easier to operate through notification flows, rollout guides, and deployment documentation
+- making the project easier to trust through explicit attribution, docs, and operator-facing explanations
+
+That combination is the reason ClawKeeper is more than a thin wrapper around upstream tools.
 
 ## Community
 
